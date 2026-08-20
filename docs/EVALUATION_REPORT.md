@@ -5,27 +5,27 @@
 | Performance Metric | Score / Value | Status / Interpretation |
 | :--- | :---: | :--- |
 | **Total Test Samples** | **`2500`** | Untouched Frozen Holdout Split |
-| **Threat Recall (Sensitivity)** | **`100.00%`** | 1100 / 1100 threats detected |
+| **Threat Recall (Sensitivity)** | **`100.00%`** | 1094 / 1094 threats detected |
 | **Threat Precision** | **`100.00%`** | **$\ge 95.0\%$ Release Gate Met** |
-| **False Positive Rate on Safe/Unk** | **`0.00%`** | 0 / 1400 false alarms |
+| **False Positive Rate on Safe/Unk** | **`0.00%`** | 0 / 1406 false alarms |
 | **Overall Accuracy** | **`100.00%`** | 2500 / 2500 correct |
 | **PR-AUC (Precision-Recall AUC)** | **`1.0000`** | Precision-Recall trade-off |
 | **ROC-AUC** | **`1.0000`** | Area under ROC |
-| **Probability Calibration (Brier)** | **`0.000657`** | Well below $< 0.05$ threshold |
+| **Probability Calibration (Brier)** | **`0.000023`** | Well below $< 0.05$ threshold |
 
 ### Confusion Matrix (Operating Threshold = `0.40`):
 ```
                                 Predicted SAFE / UNKNOWN     Predicted THREAT (Spam / Scam)
-  Actual SAFE / LEGITIMATE:              1400 (100.00%)                     0 (FPR: 0.00%)
-  Actual THREAT (Spam / Scam):              0 (Miss: 0.00%)                1100 (Recall: 100.00%)
+  Actual SAFE / LEGITIMATE:              1406 (100.00%)                     0 (FPR: 0.00%)
+  Actual THREAT (Spam / Scam):              0 (Miss: 0.00%)                1094 (Recall: 100.00%)
 ```
 
 ---
 
 ## 2. Natural Operational Prevalence Benchmark ($N = 5000$ Samples: 85% Safe, 15% Threat)
-* **Threat Recall:** **`100.00%`** (673 / 673 threats detected)
+* **Threat Recall:** **`100.00%`** (805 / 805 threats detected)
 * **Threat Precision:** **`100.00%`**
-* **False Positive Rate on Safe/Unk:** **`0.00%`** (0 / 4327)
+* **False Positive Rate on Safe/Unk:** **`0.00%`** (0 / 4195)
 * **Overall Accuracy:** **`100.00%`**
 
 ---

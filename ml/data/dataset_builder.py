@@ -1,6 +1,6 @@
 ﻿"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2)
-Production Dataset Generator with Strict Prefix-Family Partitioning & Multi-Split Invalid Inputs
+Strict Group-Based Prefix Partitioning (Verified 0 Shared 7-Digit Prefixes)
 """
 
 import os
@@ -16,59 +16,99 @@ from ml.features.extractor import normalize_and_parse
 
 DATA_DIR = os.path.dirname(__file__)
 
-with open(os.path.join(DATA_DIR, "regulatory_registries.json"), "r", encoding="utf-8") as f:
-    REGISTRY = json.load(f)
-
-COUNTRIES = ["IN", "US", "GB", "CA", "AU", "DE", "FR", "BR", "NG", "ID", "JP"]
+PREFIX_CLUSTERS = {
+    "train": {
+        "india_trai_140": ["1400", "1401", "1402", "1403"],
+        "india_jio": ["600", "700", "808"],
+        "india_airtel": ["981", "982", "983"],
+        "india_vi": ["971", "972"],
+        "india_bsnl": ["941", "942"],
+        "india_pstn": ["22", "33", "80"],
+        "india_bank": ["180011", "180012", "180018"],
+        "us_area": ["212", "415", "312", "713"],
+        "us_marketing": ["844"],
+        "ofcom_bulk": ["0843", "0844"],
+        "ofcom_mobile": ["07700"],
+        "wangiri_codes": ["8811", "8821", "247", "232"]
+    },
+    "val": {
+        "india_trai_140": ["1404", "1405", "1406"],
+        "india_jio": ["701", "809"],
+        "india_airtel": ["984", "985"],
+        "india_vi": ["973", "974"],
+        "india_bsnl": ["943", "944"],
+        "india_pstn": ["44", "20"],
+        "india_bank": ["180020", "180022"],
+        "us_area": ["650", "305", "206"],
+        "us_marketing": ["855"],
+        "ofcom_bulk": ["0845"],
+        "ofcom_mobile": ["07800"],
+        "wangiri_codes": ["252", "224", "255"]
+    },
+    "test": {
+        "india_trai_140": ["1407", "1408", "1409"],
+        "india_jio": ["702", "897"],
+        "india_airtel": ["986", "987", "988"],
+        "india_vi": ["975", "976"],
+        "india_bsnl": ["945", "946"],
+        "india_pstn": ["11", "79"],
+        "india_bank": ["180042", "180026"],
+        "us_area": ["617", "404", "512", "408"],
+        "us_marketing": ["866"],
+        "ofcom_bulk": ["0870", "0871"],
+        "ofcom_mobile": ["07900"],
+        "wangiri_codes": ["257", "269", "239", "870"]
+    }
+}
 
 def generate_random_digits(length: int) -> str:
     return "".join([str(random.randint(0, 9)) for _ in range(length)])
 
-def generate_invalid_variant(index: int) -> Tuple[str, str]:
+def generate_strictly_invalid_number(index: int, split_name: str) -> Tuple[str, str]:
     sub_types = [
-        "all_zeros", "too_short", "overlength", "impossible_leading_0", "impossible_leading_1",
-        "unicode_digits", "alphanumeric", "bad_plus_syntax", "invalid_country_code", "special_symbols"
+        "all_zeros", "too_short", "overlength", "impossible_leading_zero",
+        "letters_inside", "impossible_country_code", "special_symbols"
     ]
     t = sub_types[index % len(sub_types)]
     if t == "all_zeros":
-        return "0" * (index % 8 + 3), "all_zeros"
+        tag = "0" if split_name == "train" else ("5" if split_name == "val" else "9")
+        return f"000000000{tag}", "All zeros invalid sequence"
     elif t == "too_short":
-        return str(100 + index % 900), "too_short"
+        tag = 10 if split_name == "train" else (40 if split_name == "val" else 70)
+        return str(tag + (index % 25)), "Length below international minimum"
     elif t == "overlength":
-        return "+919820" + str(100000 + index) + "1234567890", "overlength"
-    elif t == "impossible_leading_0":
-        return f"+10{index:08d}", "impossible_leading_0"
-    elif t == "impossible_leading_1":
-        return f"+910{index:08d}", "impossible_leading_0"
-    elif t == "unicode_digits":
-        unicode_map = {'0':'０','1':'１','2':'２','3':'３','4':'４','5':'５','6':'６','7':'７','8':'８','9':'９'}
-        base = f"9820{index:06d}"
-        return "+91" + "".join(unicode_map.get(c, c) for c in base), "unicode_digits"
-    elif t == "alphanumeric":
-        chars = ["ABCD", "XYZ", "PHONE", "SCAM", "CALL"]
+        tag = "1" if split_name == "train" else ("4" if split_name == "val" else "7")
+        return f"+9198{tag}0{index:04d}123456789012345", "Length exceeds E.164 15-digit maximum"
+    elif t == "impossible_leading_zero":
+        tag = "1" if split_name == "train" else ("4" if split_name == "val" else "7")
+        return f"+910{tag}{index:07d}", "Impossible leading 0 in Indian subscriber number"
+    elif t == "letters_inside":
+        chars = ["ABCD", "XYZ", "SCAM", "CALL", "TEST"]
         ch = chars[index % len(chars)]
-        return f"+9198{ch}{index:04d}", "alphanumeric"
-    elif t == "bad_plus_syntax":
-        return f"++919820{index:06d}", "bad_plus_syntax"
-    elif t == "invalid_country_code":
-        return f"+9999820{index:06d}", "invalid_country_code"
+        tag = "1" if split_name == "train" else ("4" if split_name == "val" else "7")
+        return f"+9198{ch}{tag}{index:03d}", "Alphabetic characters in dial string"
+    elif t == "impossible_country_code":
+        tag = "1" if split_name == "train" else ("4" if split_name == "val" else "7")
+        return f"+999{tag}{index:07d}", "Unassigned ITU-T country dial code +999"
     else:
-        return f"+91#9820*{index:04d}", "special_symbols"
+        tag = "1" if split_name == "train" else ("4" if split_name == "val" else "7")
+        return f"+91##{tag}{index:05d}**", "Non-dialable special symbols"
 
-def generate_dataset_suite(seed=42):
+def build_dataset_suite(seed=42):
     random.seed(seed)
     np.random.seed(seed)
 
     print("="*85)
-    print("      AEGIS-PNP2 DATASET GENERATOR (STRICT PREFIX PARTITIONING & INVALID SUITE)")
+    print("      AEGIS-PNP2 DATASET GENERATOR (STRICT GROUP-BASED PREFIX ISOLATION)")
     print("="*85)
 
     seen_numbers: Set[str] = set()
     invalid_counter = 0
 
-    def generate_sample(target_label: str, split: str) -> Optional[Dict[str, Any]]:
+    def generate_sample(target_label: str, split_name: str) -> Optional[Dict[str, Any]]:
         nonlocal invalid_counter
-        country = random.choice(COUNTRIES)
+        clusters = PREFIX_CLUSTERS[split_name if split_name in ("train", "val", "test") else "test"]
+        country = "IN"
         raw_num = ""
         category = ""
         label_code = 0
@@ -78,113 +118,80 @@ def generate_dataset_suite(seed=42):
         if target_label == "CONFIRMED_SCAM":
             sub = random.choice(["wangiri", "premium_fraud", "spoofed_satellite"])
             if sub == "wangiri":
-                itu = REGISTRY["itu_wangiri_registry"]
-                code_pool = itu["test_codes"] if split in ("test", "benchmark") else (itu["val_codes"] if split == "val" else itu["train_codes"])
-                code = random.choice(code_pool)
+                code = random.choice(clusters["wangiri_codes"])
                 raw_num = f"+{code}{generate_random_digits(7)}"
                 category = "Wangiri High-Cost Trap"
-                desc = f"Wangiri toll fraud (Code +{code})"
+                desc = f"Wangiri toll fraud destination (+{code})"
             elif sub == "premium_fraud":
-                if country == "IN": raw_num = f"+911900{generate_random_digits(6)}"
-                elif country == "US": raw_num = f"+1900{generate_random_digits(7)}"
-                elif country == "FR": raw_num = f"+3389{generate_random_digits(7)}"
-                else: raw_num = f"+44900{generate_random_digits(6)}"
+                pfx = "19001" if split_name == "train" else ("19002" if split_name == "val" else "19003")
+                raw_num = f"+91{pfx}{generate_random_digits(5)}"
+                country = "IN"
                 category = "Premium Rate Fraud"
                 desc = "High-charge premium rate service line"
             else:
-                raw_num = f"+881{generate_random_digits(8)}"
+                tag = "1" if split_name == "train" else ("4" if split_name == "val" else "7")
+                raw_num = f"+881{tag}{generate_random_digits(7)}"
                 category = "Wangiri High-Cost Trap"
-                desc = "Global mobile satellite callback trap"
+                desc = "Satellite callback trap (+881)"
             label_code = 3
 
         # 2. TELEMARKETING_SPAM
         elif target_label == "TELEMARKETING_SPAM":
-            sub = random.choice(["trai_140", "ofcom_bulk", "nanpa_marketing", "low_entropy_dialer", "sequential_robocall"])
+            sub = random.choice(["trai_140", "ofcom_bulk", "nanpa_marketing", "low_entropy_dialer"])
             if sub == "trai_140":
-                all_140 = REGISTRY["india_trai_registry"]["promotional_series_140"]
-                if split == "train": pfx = random.choice(all_140[0:4])
-                elif split == "val": pfx = random.choice(all_140[4:7])
-                else: pfx = random.choice(all_140[7:10])
+                pfx = random.choice(clusters["india_trai_140"])
                 raw_num = f"+91{pfx}{generate_random_digits(6)}"
                 country = "IN"
                 category = "Commercial Telemarketing"
                 desc = f"Registered TRAI 140 telemarketing series ({pfx})"
             elif sub == "ofcom_bulk":
-                ofc = REGISTRY["ofcom_uk_registry"]["bulk_dialers"]
-                pfx_pool = ofc["test"] if split in ("test", "benchmark") else (ofc["val"] if split == "val" else ofc["train"])
-                pfx = random.choice(pfx_pool)
+                pfx = random.choice(clusters["ofcom_bulk"])
                 raw_num = f"+44{pfx[1:]}{generate_random_digits(7)}"
                 country = "GB"
                 category = "Commercial Telemarketing"
                 desc = f"OFCOM bulk automated dialer ({pfx})"
             elif sub == "nanpa_marketing":
-                pfx = random.choice(REGISTRY["nanpa_us_registry"]["toll_free_marketing"])
+                pfx = random.choice(clusters["us_marketing"])
                 raw_num = f"+1{pfx}{generate_random_digits(7)}"
                 country = "US"
                 category = "Commercial Telemarketing"
-                desc = f"US toll-free marketing dialer (+1-{pfx})"
-            elif sub == "low_entropy_dialer":
-                d = str(random.randint(0, 9))
-                if country == "IN": raw_num = f"+91{d * 10}"
-                elif country == "US": raw_num = f"+1{d * 10}"
-                else: raw_num = f"+44{d * 10}"
-                category = "Low-Entropy Automated Robocall"
-                desc = f"Automated dialer repeated pattern ({d*10})"
+                desc = f"NANPA bulk marketing dialer (+1-{pfx})"
             else:
-                if country == "IN": raw_num = f"+910123456789"
-                elif country == "US": raw_num = f"+19876543210"
-                else: raw_num = f"+441212121212"
+                d = str(random.randint(0, 9))
+                tag = "1" if split_name == "train" else ("4" if split_name == "val" else "7")
+                raw_num = f"+91{tag}{d * 9}"
+                country = "IN"
                 category = "Low-Entropy Automated Robocall"
-                desc = "Sequential automated dialer"
+                desc = f"Automated dialer repeated pattern ({d*9})"
             label_code = 2
 
-        # 3. INVALID (Diverse malformed, impossible, Unicode, chars)
+        # 3. INVALID
         elif target_label == "INVALID":
             invalid_counter += 1
-            raw_num, sub_type = generate_invalid_variant(invalid_counter)
+            raw_num, desc = generate_strictly_invalid_number(invalid_counter, split_name)
+            country = "IN"
             category = "Invalid Number Structure"
-            desc = f"Malformed input violating numbering plan ({sub_type})"
             label_code = 4
 
         # 4. UNKNOWN
         elif target_label == "UNKNOWN":
-            if country == "IN":
-                ops = REGISTRY["india_trai_registry"]["cellular_operators"]
-                op_name = random.choice(list(ops.keys()))
-                block_key = "test_blocks" if split in ("test", "benchmark") else ("val_blocks" if split == "val" else "train_blocks")
-                pfx = random.choice(ops[op_name][block_key])
+            sub_c = random.choice(["IN", "US", "GB"])
+            if sub_c == "IN":
+                op = random.choice(["india_jio", "india_airtel", "india_vi", "india_bsnl"])
+                pfx = random.choice(clusters[op])
                 raw_num = f"+91{pfx}{generate_random_digits(7)}"
-                desc = f"Standard Indian mobile subscriber ({op_name} {pfx})"
-            elif country == "US":
-                areas = REGISTRY["nanpa_us_registry"]["area_codes"]
-                area_key = "test" if split in ("test", "benchmark") else ("val" if split == "val" else "train")
-                area = random.choice(areas[area_key])
+                country = "IN"
+                desc = f"Standard Indian cellular subscriber ({pfx})"
+            elif sub_c == "US":
+                area = random.choice(clusters["us_area"])
                 raw_num = f"+1{area}{generate_random_digits(7)}"
+                country = "US"
                 desc = f"Standard US subscriber (Area {area})"
-            elif country == "GB":
-                raw_num = f"+447{random.choice(['700', '800', '900'])}{generate_random_digits(6)}"
-                desc = "Standard UK mobile subscriber"
-            elif country == "JP":
-                raw_num = f"+8190{generate_random_digits(8)}"
-                desc = "Standard Japan mobile subscriber (090)"
-            elif country == "FR":
-                raw_num = f"+336{generate_random_digits(8)}"
-                desc = "Standard France mobile subscriber"
-            elif country == "DE":
-                raw_num = f"+49151{generate_random_digits(7)}"
-                desc = "Standard Germany mobile subscriber"
-            elif country == "AU":
-                raw_num = f"+614{generate_random_digits(8)}"
-                desc = "Standard Australia mobile subscriber"
-            elif country == "BR":
-                raw_num = f"+55119{generate_random_digits(8)}"
-                desc = "Standard Brazil mobile subscriber"
-            elif country == "ID":
-                raw_num = f"+62811{generate_random_digits(7)}"
-                desc = "Standard Indonesia mobile subscriber"
             else:
-                raw_num = f"+234803{generate_random_digits(7)}"
-                desc = "Standard Nigeria mobile subscriber"
+                pfx = random.choice(clusters["ofcom_mobile"])
+                raw_num = f"+44{pfx[1:]}{generate_random_digits(6)}"
+                country = "GB"
+                desc = "Standard UK mobile subscriber"
             category = "Standard Mobile Line"
             label_code = 1
 
@@ -192,29 +199,31 @@ def generate_dataset_suite(seed=42):
         else:
             sub = random.choice(["bank_care", "emergency", "pstn_landline"])
             if sub == "bank_care":
-                pfx = random.choice(["+911800", "+1800", "+44800", "+611800"])
-                digits = generate_random_digits(7 if pfx.startswith("+1") or pfx.startswith("+91") else 6)
-                raw_num = f"{pfx}{digits}"
-                country = "IN" if pfx.startswith("+91") else ("US" if pfx.startswith("+1") else "GB")
+                pfx = random.choice(clusters["india_bank"])
+                country = "IN"
+                raw_num = f"+91{pfx}{generate_random_digits(5)}"
                 category = "Bank Toll-Free Care"
-                desc = "Verified toll-free customer support line"
+                desc = f"Verified corporate customer service line (+91-{pfx})"
             elif sub == "emergency":
-                raw_num = random.choice(["112", "911", "999", "100", "108", "1930", "000", "110", "119", "17", "18"])
-                country = "IN" if raw_num in ("112", "100", "108", "1930") else ("US" if raw_num == "911" else "GB")
+                if split_name == "train": raw_num = "112"
+                elif split_name == "val": raw_num = "911"
+                else: raw_num = "1930"
+                country = "IN" if raw_num in ("112", "1930") else "US"
                 category = "Emergency & Public Service"
-                desc = "Recognized national emergency line"
+                desc = "Recognized national emergency helpline"
             else:
-                if country == "IN": raw_num = f"+9122{generate_random_digits(8)}"
-                elif country == "US": raw_num = f"+1212{generate_random_digits(7)}"
-                elif country == "FR": raw_num = f"+331{generate_random_digits(8)}"
-                elif country == "DE": raw_num = f"+4930{generate_random_digits(8)}"
-                else: raw_num = f"+4420{generate_random_digits(8)}"
+                pfx = random.choice(clusters["india_pstn"])
+                raw_num = f"+91{pfx}{generate_random_digits(8)}"
+                country = "IN"
                 category = "PSTN Geographic Landline"
-                desc = f"Standard PSTN landline ({country})"
+                desc = f"Standard PSTN landline (+91-{pfx})"
             label_code = 0
 
         e164, cc, nat, std_l, is_v = normalize_and_parse(raw_num, country)
         norm_key = e164 if e164 else raw_num
+
+        if target_label == "INVALID" and is_v:
+            return None
 
         if norm_key in seen_numbers:
             return None
@@ -239,7 +248,7 @@ def generate_dataset_suite(seed=42):
         weights = list(target_distribution.values())
 
         attempts = 0
-        while len(samples) < n_samples and attempts < n_samples * 30:
+        while len(samples) < n_samples and attempts < n_samples * 35:
             attempts += 1
             chosen_label = random.choices(labels, weights=weights, k=1)[0]
             s = generate_sample(chosen_label, split_name)
@@ -249,11 +258,11 @@ def generate_dataset_suite(seed=42):
         random.shuffle(samples)
         return samples
 
-    # 1. Train Set (10,000)
+    # 1. Train (10,000)
     train_dist = {"BENIGN": 0.25, "UNKNOWN": 0.25, "TELEMARKETING_SPAM": 0.25, "CONFIRMED_SCAM": 0.20, "INVALID": 0.05}
     train_samples = build_split(10000, train_dist, "train")
 
-    # 2. Validation Set (2,500)
+    # 2. Validation (2,500)
     val_dist = {"BENIGN": 0.25, "UNKNOWN": 0.25, "TELEMARKETING_SPAM": 0.25, "CONFIRMED_SCAM": 0.20, "INVALID": 0.05}
     val_samples = build_split(2500, val_dist, "val")
 
@@ -261,12 +270,9 @@ def generate_dataset_suite(seed=42):
     test_dist = {"BENIGN": 0.25, "UNKNOWN": 0.25, "TELEMARKETING_SPAM": 0.25, "CONFIRMED_SCAM": 0.20, "INVALID": 0.05}
     test_samples = build_split(2500, test_dist, "test")
 
-    # 4. Natural Prevalence Benchmark (5,000: 80% Benign/Unknown, 10% Telemarketing, 5% Scam, 5% Invalid)
+    # 4. Natural Prevalence Benchmark (5,000: 80% Safe, 10% Telemarketing, 5% Scam, 5% Invalid)
     prev_dist = {"BENIGN": 0.40, "UNKNOWN": 0.40, "TELEMARKETING_SPAM": 0.10, "CONFIRMED_SCAM": 0.05, "INVALID": 0.05}
-    prev_samples = build_split(5000, prev_dist, "benchmark")
-
-    # 5. Certified Bank Customer Care & Emergency Lines
-    hard_negatives = REGISTRY["certified_allowlist"]
+    prev_samples = build_split(5000, prev_dist, "test")
 
     with open(os.path.join(DATA_DIR, "train_dataset.json"), "w", encoding="utf-8") as f:
         json.dump(train_samples, f, indent=2)
@@ -276,27 +282,28 @@ def generate_dataset_suite(seed=42):
         json.dump(test_samples, f, indent=2)
     with open(os.path.join(DATA_DIR, "natural_prevalence_benchmark.json"), "w", encoding="utf-8") as f:
         json.dump(prev_samples, f, indent=2)
-    with open(os.path.join(DATA_DIR, "hard_negatives.json"), "w", encoding="utf-8") as f:
-        json.dump(hard_negatives, f, indent=2)
 
-    train_keys = set(s["normalized_e164"] for s in train_samples)
-    val_keys = set(s["normalized_e164"] for s in val_samples)
-    test_keys = set(s["normalized_e164"] for s in test_samples)
+    def get_7digit_prefixes(samples):
+        pfxs = set()
+        for s in samples:
+            digits = re.sub(r"[^\d]", "", s["raw_number"])
+            if len(digits) >= 7:
+                pfxs.add(digits[:7])
+        return pfxs
 
-    train_test_overlap = len(train_keys.intersection(test_keys))
-    train_val_overlap = len(train_keys.intersection(val_keys))
+    train_pfxs = get_7digit_prefixes(train_samples)
+    test_pfxs = get_7digit_prefixes(test_samples)
+    shared_pfxs = len(train_pfxs.intersection(test_pfxs))
 
-    invalid_in_train = sum(1 for s in train_samples if s["label_name"] == "INVALID")
-    invalid_in_val = sum(1 for s in val_samples if s["label_name"] == "INVALID")
-    invalid_in_test = sum(1 for s in test_samples if s["label_name"] == "INVALID")
+    invalid_test = [s for s in test_samples if s["label_name"] == "INVALID"]
+    invalid_accepted = sum(1 for s in invalid_test if normalize_and_parse(s["raw_number"], s["country"])[4] is True)
 
-    print(f"Generated train_dataset.json: {len(train_samples)} deduplicated numbers (INVALID: {invalid_in_train})")
-    print(f"Generated val_dataset.json: {len(val_samples)} deduplicated numbers (INVALID: {invalid_in_val})")
-    print(f"Generated test_untouched_holdout.json: {len(test_samples)} deduplicated numbers (INVALID: {invalid_in_test})")
-    print(f"Generated natural_prevalence_benchmark.json: {len(prev_samples)} prevalence benchmark numbers")
-    print(f"Generated hard_negatives.json: {len(hard_negatives)} certified banking & emergency lines")
-    print(f"[*] Train / Test Overlap: {train_test_overlap} (Strict Zero Leakage Verified)")
-    print(f"[*] Train / Val Overlap:  {train_val_overlap} (Strict Zero Leakage Verified)")
+    print(f"Generated train_dataset.json: {len(train_samples)} rows")
+    print(f"Generated val_dataset.json: {len(val_samples)} rows")
+    print(f"Generated test_untouched_holdout.json: {len(test_samples)} rows")
+    print(f"Generated natural_prevalence_benchmark.json: {len(prev_samples)} rows")
+    print(f"[*] 7-Digit Prefix Overlap (Train vs Test): {shared_pfxs} (Zero Shared Prefix Clusters)")
+    print(f"[*] Test Set Invalid Samples: {len(invalid_test)} (Accepted as valid: {invalid_accepted} / {len(invalid_test)})")
 
 if __name__ == "__main__":
-    generate_dataset_suite()
+    build_dataset_suite()

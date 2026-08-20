@@ -1,37 +1,17 @@
 {
-  "schema_version": "2.0.0",
-  "model_name": "AEGIS-PNP2",
-  "total_test_cases": 20,
-  "calibration_constants": {
-    "param_A": -0.9555244382162512,
-    "param_B": 1.0902767640543427
-  },
-  "operating_thresholds": {
-    "legitimate_upper_bound": 0.15,
-    "unknown_abstain_upper_bound": 0.4,
-    "spam_upper_bound": 0.7,
-    "scam_lower_bound": 0.7
-  },
+  "schema_version": "2.1.0",
   "test_cases": [
     {
       "case_id": "sbi_bank_customer_care",
       "raw_number": "+911800112211",
-      "normalized_e164": "+911800112211",
       "country": "IN",
+      "normalized_e164": "+911800112211",
       "is_valid": true,
-      "description": "Verified SBI Bank Customer Care (Hard Negative)",
       "expected_tier": "LEGITIMATE",
-      "actual_tier": "LEGITIMATE",
-      "raw_logit": -7.803617,
-      "calibrated_prob": 0.000194,
-      "risk_score": 0,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "hard_neg_legitimate_bank_support"
-      ],
-      "vector_36": [
+      "expected_pattern_risk_score": 0,
+      "raw_logit": -7.406922,
+      "calibrated_probability": 0.000375,
+      "features": [
         1.0,
         0.6667,
         0.0,
@@ -68,27 +48,20 @@
         0.2222,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Verified SBI customer service line"
     },
     {
       "case_id": "hdfc_bank_priority",
       "raw_number": "+9118002026161",
-      "normalized_e164": "+9118002026161",
       "country": "IN",
+      "normalized_e164": "+9118002026161",
       "is_valid": true,
-      "description": "Verified HDFC Bank Priority Support",
       "expected_tier": "LEGITIMATE",
-      "actual_tier": "LEGITIMATE",
-      "raw_logit": -7.803617,
-      "calibrated_prob": 0.000194,
-      "risk_score": 0,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "hard_neg_legitimate_bank_support"
-      ],
-      "vector_36": [
+      "expected_pattern_risk_score": 0,
+      "raw_logit": -10.102893,
+      "calibrated_probability": 2.1e-05,
+      "features": [
         1.0,
         0.7333,
         0.0667,
@@ -125,27 +98,20 @@
         0.4444,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Verified HDFC customer service line"
     },
     {
       "case_id": "chase_bank_support",
       "raw_number": "+18009359935",
-      "normalized_e164": "+18009359935",
       "country": "US",
+      "normalized_e164": "+18009359935",
       "is_valid": true,
-      "description": "Verified Chase Bank Customer Care line",
       "expected_tier": "LEGITIMATE",
-      "actual_tier": "LEGITIMATE",
-      "raw_logit": -7.803617,
-      "calibrated_prob": 0.000194,
-      "risk_score": 0,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "hard_neg_legitimate_bank_support"
-      ],
-      "vector_36": [
+      "expected_pattern_risk_score": 0,
+      "raw_logit": -7.406922,
+      "calibrated_probability": 0.000375,
+      "features": [
         1.0,
         0.6667,
         0.0,
@@ -182,28 +148,20 @@
         0.4568,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Verified Chase customer support"
     },
     {
       "case_id": "barclays_uk_care",
       "raw_number": "+44800123456",
-      "normalized_e164": "+44800123456",
       "country": "GB",
+      "normalized_e164": "+44800123456",
       "is_valid": true,
-      "description": "Verified Barclays UK Toll-Free Support",
       "expected_tier": "LEGITIMATE",
-      "actual_tier": "LEGITIMATE",
-      "raw_logit": -7.684615,
-      "calibrated_prob": 0.000217,
-      "risk_score": 0,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "hard_neg_legitimate_bank_support",
-        "digit_max_repeat_run"
-      ],
-      "vector_36": [
+      "expected_pattern_risk_score": 0,
+      "raw_logit": -7.406922,
+      "calibrated_probability": 0.000375,
+      "features": [
         1.0,
         0.6,
         0.0667,
@@ -240,27 +198,20 @@
         0.1944,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Verified Barclays UK freephone line"
     },
     {
       "case_id": "emergency_112",
       "raw_number": "112",
-      "normalized_e164": "112",
       "country": "IN",
+      "normalized_e164": "112",
       "is_valid": true,
-      "description": "National Emergency Line 112",
       "expected_tier": "LEGITIMATE",
-      "actual_tier": "LEGITIMATE",
-      "raw_logit": -7.49804,
-      "calibrated_prob": 0.00026,
-      "risk_score": 0,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "hard_neg_emergency_service"
-      ],
-      "vector_36": [
+      "expected_pattern_risk_score": 0,
+      "raw_logit": -6.958075,
+      "calibrated_probability": 0.000605,
+      "features": [
         1.0,
         0.2,
         0.0,
@@ -297,27 +248,20 @@
         0.0556,
         0.0,
         0.0
-      ]
+      ],
+      "description": "National Emergency 112"
     },
     {
       "case_id": "emergency_911",
       "raw_number": "911",
-      "normalized_e164": "911",
       "country": "US",
+      "normalized_e164": "911",
       "is_valid": true,
-      "description": "US Emergency Line 911",
       "expected_tier": "LEGITIMATE",
-      "actual_tier": "LEGITIMATE",
-      "raw_logit": -7.684615,
-      "calibrated_prob": 0.000217,
-      "risk_score": 0,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "hard_neg_emergency_service"
-      ],
-      "vector_36": [
+      "expected_pattern_risk_score": 0,
+      "raw_logit": -6.958077,
+      "calibrated_probability": 0.000605,
+      "features": [
         1.0,
         0.2,
         0.0,
@@ -354,27 +298,20 @@
         0.4444,
         0.0,
         0.0
-      ]
+      ],
+      "description": "US Emergency 911"
     },
     {
       "case_id": "emergency_1930",
       "raw_number": "1930",
-      "normalized_e164": "1930",
       "country": "IN",
+      "normalized_e164": "1930",
       "is_valid": true,
-      "description": "National Cyber Crime Reporting Portal Helpline",
       "expected_tier": "LEGITIMATE",
-      "actual_tier": "LEGITIMATE",
-      "raw_logit": -7.583509,
-      "calibrated_prob": 0.00024,
-      "risk_score": 0,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "hard_neg_emergency_service"
-      ],
-      "vector_36": [
+      "expected_pattern_risk_score": 0,
+      "raw_logit": -6.958077,
+      "calibrated_probability": 0.000605,
+      "features": [
         1.0,
         0.2667,
         0.0,
@@ -411,27 +348,20 @@
         0.6296,
         0.0,
         0.0
-      ]
+      ],
+      "description": "India Cyber Crime Helpline"
     },
     {
       "case_id": "standard_indian_mobile",
       "raw_number": "+919820481729",
-      "normalized_e164": "+919820481729",
       "country": "IN",
+      "normalized_e164": "+919820481729",
       "is_valid": true,
-      "description": "Standard Indian cellular subscriber line",
-      "expected_tier": "UNKNOWN",
-      "actual_tier": "LEGITIMATE",
-      "raw_logit": -8.368053,
-      "calibrated_prob": 0.000113,
-      "risk_score": 0,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "standard_entropy_structure"
-      ],
-      "vector_36": [
+      "expected_tier": "LEGITIMATE",
+      "expected_pattern_risk_score": 0,
+      "raw_logit": -10.204656,
+      "calibrated_probability": 1.9e-05,
+      "features": [
         1.0,
         0.6667,
         0.0,
@@ -468,27 +398,20 @@
         0.5185,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Clean Indian mobile subscriber"
     },
     {
       "case_id": "standard_us_landline",
       "raw_number": "+12127363100",
-      "normalized_e164": "+12127363100",
       "country": "US",
+      "normalized_e164": "+12127363100",
       "is_valid": true,
-      "description": "Standard NYC geographic landline",
-      "expected_tier": "UNKNOWN",
-      "actual_tier": "LEGITIMATE",
-      "raw_logit": -8.34608,
-      "calibrated_prob": 0.000116,
-      "risk_score": 0,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "standard_entropy_structure"
-      ],
-      "vector_36": [
+      "expected_tier": "LEGITIMATE",
+      "expected_pattern_risk_score": 0,
+      "raw_logit": -10.204655,
+      "calibrated_probability": 1.9e-05,
+      "features": [
         1.0,
         0.6667,
         0.0,
@@ -525,27 +448,20 @@
         0.2469,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Clean US geographic landline"
     },
     {
       "case_id": "standard_uk_mobile",
       "raw_number": "+447700900123",
-      "normalized_e164": "+447700900123",
       "country": "GB",
+      "normalized_e164": "+447700900123",
       "is_valid": false,
-      "description": "Standard UK mobile subscriber",
-      "expected_tier": "UNKNOWN",
-      "actual_tier": "INVALID",
-      "raw_logit": -8.368053,
-      "calibrated_prob": 0.000113,
-      "risk_score": 0,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": true,
-      "top_reason_codes": [
-        "num_is_valid_e164"
-      ],
-      "vector_36": [
+      "expected_tier": "INVALID",
+      "expected_pattern_risk_score": 0,
+      "raw_logit": 0.0,
+      "calibrated_probability": 0.0,
+      "features": [
         0.0,
         0.6667,
         0.0,
@@ -582,27 +498,20 @@
         0.3457,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Clean UK mobile subscriber"
     },
     {
       "case_id": "standard_jp_mobile",
       "raw_number": "+819012345678",
-      "normalized_e164": "+819012345678",
       "country": "JP",
+      "normalized_e164": "+819012345678",
       "is_valid": true,
-      "description": "Standard Japan cellular subscriber (090)",
-      "expected_tier": "UNKNOWN",
-      "actual_tier": "LEGITIMATE",
-      "raw_logit": -3.21732,
-      "calibrated_prob": 0.0153,
-      "risk_score": 2,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "digit_max_repeat_run"
-      ],
-      "vector_36": [
+      "expected_tier": "LEGITIMATE",
+      "expected_pattern_risk_score": 0,
+      "raw_logit": -10.204656,
+      "calibrated_probability": 1.9e-05,
+      "features": [
         1.0,
         0.6667,
         0.0,
@@ -639,27 +548,20 @@
         0.2099,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Clean Japan mobile subscriber"
     },
     {
       "case_id": "trai_140_telemarketer",
       "raw_number": "+911409988776",
-      "normalized_e164": "+911409988776",
       "country": "IN",
+      "normalized_e164": "+911409988776",
       "is_valid": true,
-      "description": "Registered TRAI 140 commercial marketing dialer",
-      "expected_tier": "SPAM",
-      "actual_tier": "SCAM",
-      "raw_logit": 7.655993,
-      "calibrated_prob": 0.998025,
-      "risk_score": 100,
-      "confidence": "HIGH",
-      "is_threat": true,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "risk_telemarketing_series"
-      ],
-      "vector_36": [
+      "expected_tier": "SCAM",
+      "expected_pattern_risk_score": 100,
+      "raw_logit": 9.423271,
+      "calibrated_probability": 0.999957,
+      "features": [
         1.0,
         0.6667,
         0.0,
@@ -696,29 +598,20 @@
         0.2346,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Registered TRAI 140 promotional line"
     },
     {
       "case_id": "uk_0843_bulk_dialer",
       "raw_number": "+448431234567",
-      "normalized_e164": "+448431234567",
       "country": "GB",
+      "normalized_e164": "+448431234567",
       "is_valid": true,
-      "description": "UK non-geographic commercial automated dialer",
-      "expected_tier": "SPAM",
-      "actual_tier": "SCAM",
-      "raw_logit": 9.700111,
-      "calibrated_prob": 0.999719,
-      "risk_score": 100,
-      "confidence": "HIGH",
-      "is_threat": true,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "risk_telemarketing_series",
-        "plan_is_premium_rate",
-        "digit_max_repeat_run"
-      ],
-      "vector_36": [
+      "expected_tier": "SCAM",
+      "expected_pattern_risk_score": 100,
+      "raw_logit": 12.245091,
+      "calibrated_probability": 0.999998,
+      "features": [
         1.0,
         0.6667,
         0.0,
@@ -755,28 +648,20 @@
         0.1605,
         0.0,
         0.0
-      ]
+      ],
+      "description": "OFCOM 0843 automated dialer"
     },
     {
       "case_id": "us_tollfree_marketing",
       "raw_number": "+18445551212",
-      "normalized_e164": "+18445551212",
       "country": "US",
+      "normalized_e164": "+18445551212",
       "is_valid": true,
-      "description": "US toll-free bulk marketing automated series",
-      "expected_tier": "SPAM",
-      "actual_tier": "SCAM",
-      "raw_logit": 7.655993,
-      "calibrated_prob": 0.998025,
-      "risk_score": 100,
-      "confidence": "HIGH",
-      "is_threat": true,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "hard_neg_legitimate_bank_support",
-        "risk_telemarketing_series"
-      ],
-      "vector_36": [
+      "expected_tier": "SCAM",
+      "expected_pattern_risk_score": 100,
+      "raw_logit": 9.893506,
+      "calibrated_probability": 0.999974,
+      "features": [
         1.0,
         0.6667,
         0.0,
@@ -813,27 +698,20 @@
         0.1481,
         0.0,
         0.0
-      ]
+      ],
+      "description": "NANPA 844 marketing series"
     },
     {
       "case_id": "wangiri_inmarsat_satellite",
       "raw_number": "+881631555123",
-      "normalized_e164": "+881631555123",
       "country": "IN",
+      "normalized_e164": "+881631555123",
       "is_valid": true,
-      "description": "Wangiri Satellite High-Cost Callback Trap",
       "expected_tier": "SCAM",
-      "actual_tier": "SPAM",
-      "raw_logit": 1.813415,
-      "calibrated_prob": 0.655315,
-      "risk_score": 66,
-      "confidence": "MEDIUM",
-      "is_threat": true,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "risk_wangiri_high_cost_prefix"
-      ],
-      "vector_36": [
+      "expected_pattern_risk_score": 100,
+      "raw_logit": 6.496006,
+      "calibrated_probability": 0.999017,
+      "features": [
         1.0,
         0.6,
         0.0667,
@@ -870,27 +748,20 @@
         0.2083,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Satellite Wangiri callback trap"
     },
     {
       "case_id": "wangiri_somalia_trap",
       "raw_number": "+25270112233",
-      "normalized_e164": "+25270112233",
       "country": "IN",
+      "normalized_e164": "+25270112233",
       "is_valid": true,
-      "description": "Wangiri African High-Cost Revenue Share Trap",
       "expected_tier": "SCAM",
-      "actual_tier": "SPAM",
-      "raw_logit": 1.81349,
-      "calibrated_prob": 0.655331,
-      "risk_score": 66,
-      "confidence": "MEDIUM",
-      "is_threat": true,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "risk_wangiri_high_cost_prefix"
-      ],
-      "vector_36": [
+      "expected_pattern_risk_score": 100,
+      "raw_logit": 6.496005,
+      "calibrated_probability": 0.999017,
+      "features": [
         1.0,
         0.5333,
         0.1333,
@@ -927,28 +798,20 @@
         0.1587,
         0.0,
         0.0
-      ]
+      ],
+      "description": "High-cost Wangiri trap"
     },
     {
       "case_id": "premium_rate_scam_in",
       "raw_number": "+911900889900",
-      "normalized_e164": "+911900889900",
       "country": "IN",
+      "normalized_e164": "+911900889900",
       "is_valid": false,
-      "description": "High-charge 1900 premium rate redirection",
-      "expected_tier": "SCAM",
-      "actual_tier": "INVALID",
-      "raw_logit": 7.178982,
-      "calibrated_prob": 0.996888,
-      "risk_score": 100,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": true,
-      "top_reason_codes": [
-        "num_is_valid_e164",
-        "plan_is_premium_rate"
-      ],
-      "vector_36": [
+      "expected_tier": "INVALID",
+      "expected_pattern_risk_score": 0,
+      "raw_logit": 0.0,
+      "calibrated_probability": 0.0,
+      "features": [
         0.0,
         0.6667,
         0.0,
@@ -985,27 +848,20 @@
         0.4321,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Premium rate redirect"
     },
     {
       "case_id": "low_entropy_dialer_all_repeats",
       "raw_number": "+917777777777",
-      "normalized_e164": "+917777777777",
       "country": "IN",
+      "normalized_e164": "+917777777777",
       "is_valid": true,
-      "description": "10-digit repeated automated dialer",
-      "expected_tier": "SPAM",
-      "actual_tier": "SCAM",
-      "raw_logit": 7.928327,
-      "calibrated_prob": 0.998477,
-      "risk_score": 100,
-      "confidence": "HIGH",
-      "is_threat": true,
-      "is_invalid": false,
-      "top_reason_codes": [
-        "digit_max_repeat_run"
-      ],
-      "vector_36": [
+      "expected_tier": "SCAM",
+      "expected_pattern_risk_score": 82,
+      "raw_logit": 1.401877,
+      "calibrated_probability": 0.817102,
+      "features": [
         1.0,
         0.6667,
         0.0,
@@ -1042,28 +898,20 @@
         0.0,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Automated low-entropy robocaller"
     },
     {
       "case_id": "invalid_all_zeros",
       "raw_number": "0000000000",
-      "normalized_e164": "0000000000",
       "country": "IN",
+      "normalized_e164": "0000000000",
       "is_valid": false,
-      "description": "Malformed all-zeros string",
       "expected_tier": "INVALID",
-      "actual_tier": "INVALID",
-      "raw_logit": 1.191608,
-      "calibrated_prob": 0.512081,
-      "risk_score": 51,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": true,
-      "top_reason_codes": [
-        "num_is_valid_e164",
-        "digit_max_repeat_run"
-      ],
-      "vector_36": [
+      "expected_pattern_risk_score": 0,
+      "raw_logit": 0.0,
+      "calibrated_probability": 0.0,
+      "features": [
         0.0,
         0.6667,
         0.0,
@@ -1100,27 +948,20 @@
         0.0,
         0.0,
         0.0
-      ]
+      ],
+      "description": "All zeros malformed sequence"
     },
     {
       "case_id": "invalid_too_short",
       "raw_number": "123",
-      "normalized_e164": "+91123",
       "country": "IN",
+      "normalized_e164": "+91123",
       "is_valid": false,
-      "description": "Incomplete invalid number string",
       "expected_tier": "INVALID",
-      "actual_tier": "INVALID",
-      "raw_logit": -5.997958,
-      "calibrated_prob": 0.001089,
-      "risk_score": 0,
-      "confidence": "HIGH",
-      "is_threat": false,
-      "is_invalid": true,
-      "top_reason_codes": [
-        "num_is_valid_e164"
-      ],
-      "vector_36": [
+      "expected_pattern_risk_score": 0,
+      "raw_logit": 0.0,
+      "calibrated_probability": 0.0,
+      "features": [
         0.0,
         0.2,
         0.4667,
@@ -1157,7 +998,8 @@
         0.1111,
         0.0,
         0.0
-      ]
+      ],
+      "description": "Underlength invalid number"
     }
   ]
 }

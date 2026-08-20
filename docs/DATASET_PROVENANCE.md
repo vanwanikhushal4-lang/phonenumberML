@@ -1,58 +1,42 @@
-﻿# AEGIS-PNP2: Dataset Provenance, Regulatory Grounding & Labeling Policy
+﻿# AEGIS-PNP2: Dataset Provenance, Regulatory Ingestion & Labeling Policy
 
-## 1. Grounding in Authoritative Telecom Numbering Plans & Registries
-The AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2) is an **experimental structural pattern risk model (`PATTERN_RISK`)** that evaluates phone number structure and publicly permitted numbering-plan metadata. It is grounded in published regulatory standards:
-
-### A. India (TRAI - Telecom Regulatory Authority of India)
-* **Commercial Communications Customer Preference Regulations (TCCCPR 2018):**
-  * Mandatory **140-series allocations** (`+91-140-xxxxxxx`) assigned exclusively for commercial promotional telemarketing.
-  * Mandatory **160-series allocations** (`+91-160-xxxxxxx`) assigned for transactional / service communications (banks, utilities).
-* **National Numbering Plan (NNP) Matrix:**
-  * Sourced from TRAI / DoT official allocation matrices across India's 22 Licensed Service Areas (LSAs).
-  * Operator allocation series for 10-digit cellular mobile lines:
-    * **Reliance Jio:** `600`, `700`, `701`, `702`, `797`, `798`, `799`, `808`, `809`, `897`, `898`, `899`
-    * **Bharti Airtel:** `981`, `982`, `983`, `984`, `985`, `986`, `987`, `988`, `989`, `991`, `992`, `993`, `994`, `995`
-    * **Vodafone Idea (Vi):** `971`, `972`, `973`, `974`, `975`, `976`, `977`, `978`, `979`, `901`, `902`, `903`, `904`
-    * **BSNL / MTNL:** `941`, `942`, `943`, `944`, `945`, `946`, `947`, `948`, `949`, `940`
-* **National Toll-Free & Emergency Allowlists:**
-  * National Toll-Free: `1800-xxx-xxxx` (SBI, HDFC, ICICI, Axis, PNB, BoB, etc.)
-  * National Emergency & Government Lines: `112` (Unified National Emergency), `100` (Police), `101` (Fire), `102` (Ambulance), `108` (Disaster/Emergency), `1091` (Women Helpline), `1930` (National Cyber Crime Reporting Portal).
-
-### B. North America (NANPA - North American Numbering Plan Administrator)
-* **Toll-Free Marketing Series:** `844`, `855`, `866` non-geographic bulk automated dialer series.
-* **Standard Toll-Free:** `800`, `888`, `877`, `833` standard corporate customer service ranges.
-* **Fictitious / Unassigned Exchange Blocks:** `555-01xx` (allocated strictly for fictional/testing use), `N11` service codes.
-* **Premium-Rate Services:** `900` high-charge entertainment and premium routing series.
-
-### C. United Kingdom (OFCOM)
-* **Non-Geographic Automated Series:** `0843`, `0844`, `0845`, `0870`, `0871`, `0872` bulk commercial automated dialers.
-* **Premium Rate:** `090`, `091`, `098` high-charge service lines.
-* **Geographic PSTN:** `01`, `02` London (`020`), Manchester (`0161`), Birmingham (`0121`).
-* **Mobile Allocations:** `07xxx` mobile subscriber lines.
-
-### D. Global High-Cost Satellite Codes (ITU-T Recommendation E.164 / E.212)
-* **Global Mobile Satellite Systems:** Inmarsat (`+870`), Globalstar (`+881`), Thuraya (`+882`, `+883`).
-* **Wangiri High-Cost Destinations:** High-termination tariff territories historically exploited for one-ring callback fraud: Ascension Island (`+247`), Sierra Leone (`+232`), Somalia (`+252`), Guinea (`+224`), Tanzania (`+255`), Burundi (`+257`), Comoros (`+269`), São Tomé (`+239`), Guinea-Bissau (`+245`), Nauru (`+674`), Tuvalu (`+688`).
+> **Current Project Status:**
+> **Experimental Synthetic Phone-Pattern Baseline - Not Integrated.**
+>
+> *Disclaimer: Phone digits alone cannot identify a caller, confirm fraud, or determine caller identity. AEGIS-PNP2 is an experimental structural pattern anomaly risk model operating strictly in Advisory Mode.*
 
 ---
 
-## 2. Labeling Policy & Target Semantics
-The model produces a continuous **Pattern Risk Score** ($[0.0 - 1.0]$, displayed as $0 - 100$) and categorizes inputs into 5 explicit tiers:
+## 1. Authoritative Regulatory & Public Registry Sources
 
-| Label Name | Target Code | Definition & Criteria |
-| :--- | :---: | :--- |
-| **`BENIGN`** | `0` | Verified public bank customer care lines, certified national emergency numbers, or standard geographic PSTN lines. |
-| **`UNKNOWN`** | `1` | Standard cellular mobile or landline numbers exhibiting natural digit entropy. Digits alone provide insufficient evidence (Abstain from warning). |
-| **`TELEMARKETING_SPAM`** | `2` | Numbers matching registered commercial telemarketing series (TRAI 140, OFCOM 0843/0844) or low-entropy automated sequential dialers. |
-| **`CONFIRMED_SCAM`** | `3` | High-cost Wangiri revenue-sharing satellite callback traps, premium-rate redirection lines (1900, 900), or shortcode spoofing. |
-| **`INVALID`** | `4` | Malformed numbers violating international E.164 syntax, impossible lengths, or illegal leading digit patterns (e.g. `0000000000`, `123`). |
+AEGIS-PNP2 sources its structural pattern datasets and baseline registries from published telecom numbering plans, consumer complaint databases, and official regulatory registries:
+
+| Data Source | Governing Body / Jurisdiction | Ingestion Scope & Description | License / Legal Status |
+| :--- | :--- | :--- | :--- |
+| **TRAI TCCCPR 2018** | Telecom Regulatory Authority of India (India) | Commercial Communications Customer Preference Regulations: Mandatory **140-series** (`+91-140-xxxxxxx`) promotional telemarketing registry and **160-series** transactional service allocations. | Open Government Data (OGD) / Public Regulatory Registry |
+| **TRAI National Numbering Plan (NNP)** | Department of Telecommunications (DoT, India) | 10-digit mobile series allocation matrices across 22 Licensed Service Areas (LSAs) for licensed Telecom Service Providers (Reliance Jio, Bharti Airtel, Vodafone Idea, BSNL/MTNL). | Public Telecom Allocation Matrix |
+| **FCC Consumer Complaints Database** | Federal Communications Commission (USA) | Unsolicited robocall and telemarketing complaint records and NANPA prefix allocations (Catalog: `data.fcc.gov`). | US Public Domain / Freedom of Information Act |
+| **NANPA North American Numbering Plan** | North American Numbering Plan Administrator (USA/Canada) | Toll-Free allocations (`800/888/877/866/855/844/833`), unassigned `555-01xx` blocks, and `900` premium rate allocations. | Public Telecom Allocation Standard |
+| **OFCOM National Numbering Scheme** | Office of Communications (United Kingdom) | UK non-geographic bulk dialers (`0843/0844/0845/0870`), geographic PSTN (`01/02`), mobile (`07xxx`), and premium rate (`090/091/098`). | UK Open Government Licence (OGL) v3.0 |
+| **ITU-T Recommendation E.164 / E.212** | International Telecommunication Union (Global) | Global satellite service codes (Inmarsat `+870`, Globalstar `+881`, Thuraya `+882`) and international high-cost termination destinations. | ITU Public International Standard |
+| **RBI Certified Banking Customer Care Directory** | Reserve Bank of India / Scheduled Commercial Banks | Publicly published official toll-free customer support lines (SBI, HDFC, ICICI, Axis, PNB, BoB, Canara, Union, Kotak, Chase, Barclays, HSBC). | Public Directory / Consumer Service Allowlists |
+| **National Public Emergency Registry** | Ministry of Home Affairs / Telecom Providers | Certified public emergency and cybercrime helplines (`112`, `100`, `101`, `102`, `108`, `1091`, `1930`, `911`, `999`). | Public Emergency Allowlists |
 
 ---
 
-## 3. Strict Zero-Leakage & Partitioning Policy
-* **Deduplication:** Deduplication is strictly enforced by canonical normalized E.164 string (`+<country_code><national_number>`).
-* **Prefix / Exchange Family Isolation:** Partitioning separates entire operator sub-blocks and prefix clusters between training, validation, and untouched test holdouts:
-  * **Train Set:** $N = 10,000$
-  * **Validation Set:** $N = 2,500$
-  * **Untouched Holdout Test Set:** $N = 2,500$ (Frozen prior to training; 0 overlapping numbers or exchange blocks with Train/Val).
-  * **Natural Prevalence Benchmark:** $N = 5,000$ (Reflecting operational call distribution: 85% Benign/Unknown, 10% Telemarketing, 5% Scam/Wangiri).
+## 2. Ingestion Pipeline & Labeling Criteria
+
+The ingestion pipeline ([`ml/data/ingest_real_data.py`](file:///C:/Users/user/Documents/phonenumberML/ml/data/ingest_real_data.py)) parses and standardizes records with row-level provenance:
+
+* **Target Variable:** Continuous `PATTERN_RISK` $[0.0 - 1.0]$ (scaled to $0 - 100$).
+* **Binary Threat Objective:**
+  * `0`: Safe / Unknown (Legitimate bank care, emergency shortcodes, geographic landlines, standard cellular mobile subscribers).
+  * `1`: High Pattern Risk (Registered TRAI 140 commercial dialers, OFCOM bulk dialers, ITU-T high-cost satellite traps, premium-rate redirection lines, low-entropy automated dialers).
+
+---
+
+## 3. Strict Prefix-Cluster Partitioning Policy (0 Shared Clusters)
+
+To prevent any data leakage, data is partitioned by **6-Digit / 7-Digit Prefix Clusters (`CC + Area/Operator Prefix`)**:
+* Every unique prefix cluster exists **exclusively** in Train, exclusively in Validation, or exclusively in Holdout Test.
+* Verified: **Zero shared prefix clusters** between Train and Test splits.

@@ -9,7 +9,8 @@ import com.google.i18n.phonenumbers.Phonenumber.PhoneNumber;
 
 /**
  * Pure Java 17 Complete End-to-End Evaluator for AEGIS-PNP2.
- * Uses official Google libphonenumber library.
+ * Loads actual phonenumber_risk_model.json, evaluates 150 GBT trees with init_value,
+ * and computes exact calibrated probability, score, tier, and reason codes.
  */
 public class JvmPhoneNumberEvaluator {
 
@@ -68,7 +69,6 @@ public class JvmPhoneNumberEvaluator {
             return r;
         }
 
-        // All zeros or malformed check
         boolean allZeros = true;
         for (char c : onlyDigits.toCharArray()) {
             if (c != '0') { allZeros = false; break; }
@@ -137,44 +137,29 @@ public class JvmPhoneNumberEvaluator {
         int natLen = p.nationalNumber.length();
         String fullE164 = p.e164;
 
-        // 0. Validity
         vec[0] = p.isValid ? 1.0f : 0.0f;
-
-        // 1. National length normalized
         vec[1] = Math.min((float) natLen / 15.0f, 1.0f);
-
-        // 2. Length discrepancy
         vec[2] = Math.min((float) Math.abs(natLen - p.stdLength) / 15.0f, 1.0f);
 
-        // 3. Shannon Entropy
         float entropy = computeEntropy(p.nationalNumber);
         vec[3] = Math.min(entropy / 3.321928f, 1.0f);
 
-        // 4. Unique ratio
         Set<Character> uniqueDigits = new HashSet<>();
         for (char c : p.nationalNumber.toCharArray()) uniqueDigits.add(c);
         vec[4] = natLen > 0 ? ((float) uniqueDigits.size() / (float) natLen) : 0.0f;
 
-        // 5. Max repeat run
         int maxRun = computeMaxRepeatRun(p.nationalNumber);
         vec[5] = Math.min((float) maxRun / 10.0f, 1.0f);
 
-        // 6 & 7. Sequential asc / desc
         int maxAsc = computeAscendingRun(p.nationalNumber);
         int maxDesc = computeDescendingRun(p.nationalNumber);
         vec[6] = Math.min((float) maxAsc / 10.0f, 1.0f);
         vec[7] = Math.min((float) maxDesc / 10.0f, 1.0f);
 
-        // 8. Alternating density
         vec[8] = computeAlternatingDensity(p.nationalNumber);
-
-        // 9. Repeated block density
         vec[9] = computeRepeatedBlockDensity(p.nationalNumber);
-
-        // 10. Palindrome symmetry
         vec[10] = computePalindromeSymmetry(p.nationalNumber);
 
-        // 11. Trailing zeros
         int trailingZeros = 0;
         for (int i = natLen - 1; i >= 0; i--) {
             if (p.nationalNumber.charAt(i) == '0') trailingZeros++;
@@ -182,14 +167,12 @@ public class JvmPhoneNumberEvaluator {
         }
         vec[11] = Math.min((float) trailingZeros / 8.0f, 1.0f);
 
-        // 12. Leading digit anomaly
         if (natLen > 0 && (p.nationalNumber.charAt(0) == '0' || p.nationalNumber.charAt(0) == '1') && (p.countryCode.equals("1") || p.countryCode.equals("91")) && !EMERGENCY_SHORTCODES.contains(onlyDigits) && !p.nationalNumber.startsWith("1800") && !p.nationalNumber.startsWith("1900") && !p.nationalNumber.startsWith("140")) {
             vec[12] = 1.0f;
         } else {
             vec[12] = 0.0f;
         }
 
-        // 13 - 19. Number Types
         boolean isTollfree = (p.type == PhoneNumberType.TOLL_FREE) || p.nationalNumber.startsWith("1800") || p.nationalNumber.startsWith("800") || p.nationalNumber.startsWith("888") || p.nationalNumber.startsWith("877") || p.nationalNumber.startsWith("866") || p.nationalNumber.startsWith("855") || p.nationalNumber.startsWith("844");
         boolean isPremium = (p.type == PhoneNumberType.PREMIUM_RATE) || (p.nationalNumber.startsWith("1900") || (p.countryCode.equals("1") && p.nationalNumber.startsWith("900")) || (p.countryCode.equals("44") && p.nationalNumber.startsWith("900")) || (p.countryCode.equals("33") && p.nationalNumber.startsWith("89")));
         boolean isVoip = (p.type == PhoneNumberType.VOIP) || p.nationalNumber.startsWith("140") || p.nationalNumber.startsWith("843");
@@ -208,7 +191,6 @@ public class JvmPhoneNumberEvaluator {
         vec[18] = isFixed ? 1.0f : 0.0f;
         vec[19] = isUan ? 1.0f : 0.0f;
 
-        // 20. Wangiri Prefix
         boolean isWangiri = WANGIRI_PREFIXES.contains(p.countryCode);
         if (!isWangiri) {
             for (String wp : WANGIRI_PREFIXES) {
@@ -217,14 +199,12 @@ public class JvmPhoneNumberEvaluator {
         }
         vec[20] = isWangiri ? 1.0f : 0.0f;
 
-        // 21. Telemarketing series
         boolean isTelemarketing = false;
         for (String pat : TELEMARKETING_PREFIXES) {
             if (fullE164.matches(pat) || rawNumber.matches(pat)) { isTelemarketing = true; break; }
         }
         vec[21] = isTelemarketing ? 1.0f : 0.0f;
 
-        // 22. Unallocated exchange
         boolean isUnallocated = false;
         if (p.countryCode.equals("1") && natLen == 10) {
             String nxx = p.nationalNumber.substring(3, 6);
@@ -232,10 +212,8 @@ public class JvmPhoneNumberEvaluator {
         }
         vec[22] = isUnallocated ? 1.0f : 0.0f;
 
-        // 23. Shortcode spoof
         vec[23] = (natLen <= 6 && rawNumber.trim().startsWith("+")) ? 1.0f : 0.0f;
 
-        // 24. Hard Negative Bank
         boolean isBank = isTollfree;
         if (!isBank) {
             for (String bp : LEGITIMATE_BANK_PATTERNS) {
@@ -244,10 +222,8 @@ public class JvmPhoneNumberEvaluator {
         }
         vec[24] = isBank ? 1.0f : 0.0f;
 
-        // 25. Hard Negative Emergency
         vec[25] = (EMERGENCY_SHORTCODES.contains(onlyDigits) || EMERGENCY_SHORTCODES.contains(p.nationalNumber)) ? 1.0f : 0.0f;
 
-        // 26. Same country
         boolean sameCountry = (defaultCountry.equals("IN") && p.countryCode.equals("91")) ||
                               (defaultCountry.equals("US") && p.countryCode.equals("1")) ||
                               (defaultCountry.equals("GB") && p.countryCode.equals("44")) ||
@@ -260,24 +236,15 @@ public class JvmPhoneNumberEvaluator {
                               (defaultCountry.equals("NG") && p.countryCode.equals("234"));
         vec[26] = sameCountry ? 1.0f : 0.0f;
 
-        // 27. Country risk tier
         if (isWangiri) vec[27] = 1.0f;
         else if (p.countryCode.equals("91") || p.countryCode.equals("1") || p.countryCode.equals("44") || p.countryCode.equals("61") || p.countryCode.equals("49") || p.countryCode.equals("33") || p.countryCode.equals("81") || p.countryCode.equals("55") || p.countryCode.equals("62") || p.countryCode.equals("234")) vec[27] = 0.10f;
         else vec[27] = 0.40f;
 
-        // 28. Joint Wangiri Trap
         vec[28] = (isWangiri && (vec[3] < 0.70f || vec[2] > 0.0f)) ? 1.0f : 0.0f;
-
-        // 29. Joint Low-Entropy Robocall
         vec[29] = ((vec[5] >= 0.50f || vec[6] >= 0.60f || vec[7] >= 0.60f || vec[8] >= 0.50f) && vec[24] == 0.0f && vec[25] == 0.0f) ? 1.0f : 0.0f;
-
-        // 30. Joint Spoofed Short Dialer
         vec[30] = (vec[2] >= 0.20f && (isPremium || isUnallocated)) ? 1.0f : 0.0f;
-
-        // 31. Joint Telemarketer Block
         vec[31] = (isTelemarketing && vec[4] <= 0.70f) ? 1.0f : 0.0f;
 
-        // 32. Digit variance
         if (natLen > 0) {
             int[] counts = new int[10];
             for (char c : p.nationalNumber.toCharArray()) {
@@ -290,7 +257,6 @@ public class JvmPhoneNumberEvaluator {
             vec[32] = Math.min(var / 5.0f, 1.0f);
         }
 
-        // 33. Consecutive diff sum
         if (natLen > 1) {
             int diffSum = 0;
             for (int i = 1; i < natLen; i++) {
@@ -299,7 +265,6 @@ public class JvmPhoneNumberEvaluator {
             vec[33] = Math.min((float) diffSum / (9.0f * (float) (natLen - 1)), 1.0f);
         }
 
-        // 34. Personal Number & 35. Pager
         vec[34] = (p.type == PhoneNumberType.PERSONAL_NUMBER) ? 1.0f : 0.0f;
         vec[35] = (p.type == PhoneNumberType.PAGER) ? 1.0f : 0.0f;
 
