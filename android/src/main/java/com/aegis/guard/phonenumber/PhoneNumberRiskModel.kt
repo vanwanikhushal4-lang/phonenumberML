@@ -3,25 +3,19 @@ package com.aegis.guard.phonenumber
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
-import kotlin.math.abs
-import kotlin.math.exp
 import kotlin.math.roundToInt
 
 /**
  * AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2) On-Device Runtime.
- * Evaluates 150-tree Gradient Boosted Trees ensemble with explicit Sigmoid Platt Scaling.
- * Validates SHA-256 integrity checksum and calibration metadata on initialization.
+ * Evaluates 150-tree Gradient Boosted Trees ensemble with continuous risk estimation.
+ * Validates SHA-256 integrity checksum, schema version, and node structures on initialization.
  */
 class PhoneNumberRiskModel {
 
     private val extractor = PhoneNumberFeatureExtractor()
     private val trees = ArrayList<DecisionTree>()
-    private var featureScalers: FloatArray = FloatArray(36) { 1.0f }
+    private var initValue: Double = 0.415229
     private var isLoaded: Boolean = false
-
-    // Explicit Sigmoid Platt Scaling Parameters
-    private var calibrationA: Double = -0.955524
-    private var calibrationB: Double = 1.090277
     private var schemaVersion: String = "2.1.0"
     private var expectedChecksum: String = ""
 
@@ -30,7 +24,7 @@ class PhoneNumberRiskModel {
         const val EXPECTED_TREE_COUNT = 150
         const val DEFAULT_THRESHOLD_SCAM = 0.70
         const val DEFAULT_THRESHOLD_SPAM = 0.40
-        const val DEFAULT_THRESHOLD_UNKNOWN = 0.15
+        const val DEFAULT_THRESHOLD_UNKNOWN = 0.12
     }
 
     data class DecisionNode(
@@ -68,14 +62,10 @@ class PhoneNumberRiskModel {
             val root = JSONObject(jsonString)
 
             // 1. Verify Schema Version
-            schemaVersion = root.optString("schema_version", "2.0.0")
+            schemaVersion = root.optString("schema_version", "2.1.0")
 
-            // 2. Extract Calibration Parameters
-            val calibObj = root.optJSONObject("calibration")
-            if (calibObj != null) {
-                calibrationA = calibObj.optDouble("param_A", calibrationA)
-                calibrationB = calibObj.optDouble("param_B", calibrationB)
-            }
+            // 2. Extract init_value
+            initValue = root.optDouble("init_value", 0.415229)
 
             // 3. Verify Trees Count
             val treesArray = root.getJSONArray("trees")
@@ -165,14 +155,14 @@ class PhoneNumberRiskModel {
 
         val features = extractor.extractFeatures(rawNumber, defaultCountry)
 
-        // Evaluate 150 trees
-        var rawLogit = 0.0
+        // Evaluate 150 trees with init_value
+        var rawLogit = initValue
         for (tree in trees) {
             rawLogit += tree.evaluate(features)
         }
 
-        // Exact Calibrated Sigmoid Platt Scaling
-        val calibratedProb = 1.0 / (1.0 + exp(calibrationA * rawLogit + calibrationB))
+        // Clip calibrated probability in [0.0, 1.0]
+        val calibratedProb = rawLogit.coerceIn(0.0, 1.0)
         val score = (calibratedProb * 100.0).roundToInt().coerceIn(0, 100)
 
         val tier = when {

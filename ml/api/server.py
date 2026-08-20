@@ -1,4 +1,4 @@
-﻿"""
+"""
 AEGIS Phone Number Risk & Reputation Backend Proxy Server (FastAPI)
 Production Hardened:
 - API Token Authentication (X-AEGIS-API-KEY)
@@ -154,8 +154,8 @@ def assess_phone_number(req: PhoneAssessmentRequest, request: Request, authorize
             evaluation_latency_ms=round(elapsed, 4)
         )
 
-    raw_logit = float(gbt_model.decision_function(features.reshape(1, -1))[0])
-    calibrated_prob = float(1.0 / (1.0 + np.exp(PARAM_A * raw_logit + PARAM_B)))
+    raw_logit = float(gbt_model.predict(features.reshape(1, -1))[0])
+    calibrated_prob = float(np.clip(raw_logit, 0.0, 1.0))
     score = int(round(calibrated_prob * 100))
 
     if calibrated_prob >= 0.70:

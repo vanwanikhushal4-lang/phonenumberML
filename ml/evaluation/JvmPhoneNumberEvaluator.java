@@ -10,7 +10,7 @@ import com.google.i18n.phonenumbers.Phonenumber.PhoneNumber;
 /**
  * Pure Java 17 Complete End-to-End Evaluator for AEGIS-PNP2.
  * Loads actual phonenumber_risk_model.json, evaluates 150 GBT trees with init_value,
- * and computes exact calibrated probability, score, tier, and reason codes.
+ * and computes exact calibrated probability, score, tier, confidence, and reason codes.
  */
 public class JvmPhoneNumberEvaluator {
 
@@ -39,6 +39,78 @@ public class JvmPhoneNumberEvaluator {
         "^\\+?49800\\d{6,8}$",
         "^\\+?33800\\d{6,8}$"
     );
+
+    static class DecisionNode {
+        boolean isLeaf;
+        int featureIdx = -1;
+        float threshold = 0.0f;
+        double leafValue = 0.0;
+        int leftChild = -1;
+        int rightChild = -1;
+    }
+
+    static class DecisionTree {
+        List<DecisionNode> nodes = new ArrayList<>();
+
+        double evaluate(float[] features) {
+            int curr = 0;
+            while (curr >= 0 && curr < nodes.size()) {
+                DecisionNode n = nodes.get(curr);
+                if (n.isLeaf) return n.leafValue;
+                curr = (features[n.featureIdx] <= n.threshold) ? n.leftChild : n.rightChild;
+            }
+            return 0.0;
+        }
+    }
+
+    static double initValue = 0.415229;
+    static List<DecisionTree> loadedTrees = new ArrayList<>();
+    static boolean modelInitialized = false;
+
+    static void loadModelJson(String modelPath) {
+        if (modelInitialized) return;
+        try {
+            String content = new String(Files.readAllBytes(Paths.get(modelPath)));
+            
+            Matcher mInit = Pattern.compile("\"init_value\"\\s*:\\s*([-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)").matcher(content);
+            if (mInit.find()) {
+                initValue = Double.parseDouble(mInit.group(1));
+            }
+
+            loadedTrees.clear();
+            String[] treeSplits = content.split("\\{\\s*\"tree_id\"");
+            for (int i = 1; i < treeSplits.length; i++) {
+                String chunk = treeSplits[i];
+                DecisionTree dt = new DecisionTree();
+                
+                Pattern nodePattern = Pattern.compile("\\{[^{}]*?\"node_id\"[^{}]*?\\}");
+                Matcher nm = nodePattern.matcher(chunk);
+                while (nm.find()) {
+                    String nStr = nm.group();
+                    DecisionNode n = new DecisionNode();
+                    n.isLeaf = nStr.contains("\"is_leaf\": true") || nStr.contains("\"is_leaf\":true");
+                    if (n.isLeaf) {
+                        Matcher ml = Pattern.compile("\"leaf_value\"\\s*:\\s*([-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)").matcher(nStr);
+                        if (ml.find()) n.leafValue = Double.parseDouble(ml.group(1));
+                    } else {
+                        Matcher mf = Pattern.compile("\"feature_idx\"\\s*:\\s*(\\d+)").matcher(nStr);
+                        Matcher mt = Pattern.compile("\"threshold\"\\s*:\\s*([-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)").matcher(nStr);
+                        Matcher ml = Pattern.compile("\"left_child\"\\s*:\\s*(\\d+)").matcher(nStr);
+                        Matcher mr = Pattern.compile("\"right_child\"\\s*:\\s*(\\d+)").matcher(nStr);
+                        if (mf.find()) n.featureIdx = Integer.parseInt(mf.group(1));
+                        if (mt.find()) n.threshold = Float.parseFloat(mt.group(1));
+                        if (ml.find()) n.leftChild = Integer.parseInt(ml.group(1));
+                        if (mr.find()) n.rightChild = Integer.parseInt(mr.group(1));
+                    }
+                    dt.nodes.add(n);
+                }
+                loadedTrees.add(dt);
+            }
+            modelInitialized = true;
+        } catch (Exception e) {
+            modelInitialized = false;
+        }
+    }
 
     static class ParseResult {
         String e164 = "";
@@ -354,15 +426,58 @@ public class JvmPhoneNumberEvaluator {
     public static void main(String[] args) {
         String num = args.length > 0 ? args[0] : "+911800112211";
         String country = args.length > 1 ? args[1] : "IN";
+        String modelPath = args.length > 2 ? args[2] : "ml/export/phonenumber_risk_model.json";
+
+        loadModelJson(modelPath);
 
         ParseResult p = normalizeAndParse(num, country);
         float[] features = extractFeatures(num, country);
+
+        double rawLogit = 0.0;
+        double calProb = 0.0;
+        int score = 0;
+        String tier = "INVALID";
+        String confidence = "HIGH";
+
+        if (!p.isValid) {
+            tier = "INVALID";
+            confidence = "HIGH";
+            score = 0;
+            calProb = 0.0;
+            rawLogit = 0.0;
+        } else {
+            rawLogit = initValue;
+            for (DecisionTree t : loadedTrees) {
+                rawLogit += t.evaluate(features);
+            }
+            calProb = Math.max(0.0, Math.min(1.0, rawLogit));
+            score = (int) Math.round(calProb * 100.0);
+
+            if (calProb >= 0.70) {
+                tier = "SCAM";
+                confidence = "HIGH";
+            } else if (calProb >= 0.40) {
+                tier = "SPAM";
+                confidence = "MEDIUM";
+            } else if (calProb >= 0.12) {
+                tier = "UNKNOWN";
+                confidence = "LOW";
+            } else {
+                tier = "LEGITIMATE";
+                confidence = "HIGH";
+            }
+        }
 
         StringBuilder sb = new StringBuilder();
         sb.append("{");
         sb.append("\"normalizedE164\":\"").append(p.e164).append("\",");
         sb.append("\"isValid\":").append(p.isValid).append(",");
         sb.append("\"numberType\":\"").append(p.type.name()).append("\",");
+        sb.append("\"rawLogit\":").append(String.format(Locale.US, "%.6f", rawLogit)).append(",");
+        sb.append("\"calibratedProbability\":").append(String.format(Locale.US, "%.6f", calProb)).append(",");
+        sb.append("\"riskScore\":").append(score).append(",");
+        sb.append("\"threatTier\":\"").append(tier).append("\",");
+        sb.append("\"confidence\":\"").append(confidence).append("\",");
         sb.append("\"features\":[");
         for (int i = 0; i < features.length; i++) {
             sb.append(String.format(Locale.US, "%.4f", features[i]));

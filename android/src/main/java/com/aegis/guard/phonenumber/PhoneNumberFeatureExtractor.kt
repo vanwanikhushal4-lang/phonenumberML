@@ -10,33 +10,35 @@ import kotlin.math.min
  * Pure Kotlin / Android on-device feature extractor (36 dimensions).
  * 100% End-to-End Deterministic Parity with Python AEGIS-PNP2 Feature Extractor.
  */
-object PhoneNumberFeatureExtractor {
+class PhoneNumberFeatureExtractor {
 
-    private val WANGIRI_PREFIXES = HashSet(
-        Arrays.asList(
-            "881", "882", "883", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870", "871", "872", "873"
+    companion object {
+        private val WANGIRI_PREFIXES = HashSet(
+            Arrays.asList(
+                "881", "882", "883", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870", "871", "872", "873"
+            )
         )
-    )
 
-    private val EMERGENCY_SHORTCODES = HashSet(
-        Arrays.asList("112", "911", "999", "100", "101", "102", "108", "1091", "1930", "000", "110", "119", "17", "18")
-    )
+        private val EMERGENCY_SHORTCODES = HashSet(
+            Arrays.asList("112", "911", "999", "100", "101", "102", "108", "1091", "1930", "000", "110", "119", "17", "18")
+        )
 
-    private val TELEMARKETING_REGEXES = listOf(
-        Regex("^\\+?91140\\d{7}$"),
-        Regex("^\\+?4484[345]\\d{7}$"),
-        Regex("^\\+?1(844|855|866)\\d{7}$"),
-        Regex("^\\+?3389\\d{7}$")
-    )
+        private val TELEMARKETING_REGEXES = listOf(
+            Regex("^\\+?91140\\d{7}$"),
+            Regex("^\\+?4484[345]\\d{7}$"),
+            Regex("^\\+?1(844|855|866)\\d{7}$"),
+            Regex("^\\+?3389\\d{7}$")
+        )
 
-    private val BANK_REGEXES = listOf(
-        Regex("^\\+?911800\\d{4,8}$"),
-        Regex("^\\+?1800\\d{7}$"),
-        Regex("^\\+?44800\\d{6,8}$"),
-        Regex("^\\+?611800\\d{6,8}$"),
-        Regex("^\\+?49800\\d{6,8}$"),
-        Regex("^\\+?33800\\d{6,8}$")
-    )
+        private val BANK_REGEXES = listOf(
+            Regex("^\\+?911800\\d{4,8}$"),
+            Regex("^\\+?1800\\d{7}$"),
+            Regex("^\\+?44800\\d{6,8}$"),
+            Regex("^\\+?611800\\d{6,8}$"),
+            Regex("^\\+?49800\\d{6,8}$"),
+            Regex("^\\+?33800\\d{6,8}$")
+        )
+    }
 
     data class NormalizedParse(
         val e164: String,
@@ -280,6 +282,17 @@ object PhoneNumberFeatureExtractor {
         vec[35] = 0.0f
 
         return vec
+    }
+
+    fun explainFeatures(features: FloatArray): List<Pair<String, String>> {
+        val list = ArrayList<Pair<String, String>>()
+        if (features[20] > 0.5f) list.add(Pair(ReasonCodes.WANGIRI_HIGH_COST_DESTINATION, "International high-cost callback fraud prefix detected"))
+        if (features[14] > 0.5f) list.add(Pair(ReasonCodes.PREMIUM_RATE_SERVICE, "High-charge premium rate destination range"))
+        if (features[21] > 0.5f) list.add(Pair(ReasonCodes.REGISTERED_TELEMARKETER_SERIES, "Commercial telemarketing allocation range"))
+        if (features[29] > 0.5f) list.add(Pair(ReasonCodes.LOW_ENTROPY_REPEATED_DIGITS, "Automated predictive dialer repetitive pattern"))
+        if (features[24] > 0.5f) list.add(Pair(ReasonCodes.LEGITIMATE_BANK_CUSTOMER_CARE, "Verified public customer care line"))
+        if (features[25] > 0.5f) list.add(Pair(ReasonCodes.EMERGENCY_HELPLINE, "Recognized national emergency helpline"))
+        return list
     }
 
     private fun computeEntropy(s: String): Float {
