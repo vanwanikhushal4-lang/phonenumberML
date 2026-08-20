@@ -1,0 +1,284 @@
+﻿"""
+AEGIS Phone Number Pattern Risk Model (AEGIS-PNP1)
+Unified, Deterministic, Privacy-Preserving Static Feature Extractor (36 Features)
+"""
+
+import os
+import sys
+import json
+import math
+import re
+import numpy as np
+from typing import Dict, Any, List, Tuple, Optional
+
+SPEC_PATH = os.path.join(os.path.dirname(__file__), "feature_spec.json")
+with open(SPEC_PATH, "r", encoding="utf-8-sig") as f:
+    FEATURE_SPEC = json.load(f)
+
+# High-Risk Wangiri & Revenue Sharing International Country / Area Codes
+WANGIRI_PREFIXES = {
+    "881", "882", "883", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870", "871", "872", "873"
+}
+
+# Registered Commercial Telemarketing / Bulk Dialer Series
+TELEMARKETING_PREFIXES = [
+    r"^\+?91140\d{7}$",
+    r"^\+?4484[345]\d{7}$",
+    r"^\+?1(844|855|866|877|888)\d{7}$",
+    r"^\+?3389\d{7}$",
+]
+
+# Legitimate Bank / Financial Institutions Customer Care Patterns (Hard Negatives)
+LEGITIMATE_BANK_PATTERNS = [
+    r"^\+?911800(112211|4253800|2026161|1080|229090|1802222|2098800|1234|2100)\b",
+    r"^\+?1800(9359935|4321000|8693557|2882020|8291040)\b",
+    r"^\+?911800\d{4,7}$",
+]
+
+# Emergency & Public Service Shortcodes
+EMERGENCY_SHORTCODES = {"112", "911", "999", "100", "101", "102", "108", "1091", "1930", "000"}
+
+def compute_shannon_entropy(digits: str) -> float:
+    if not digits: return 0.0
+    length = len(digits)
+    freq = {}
+    for ch in digits:
+        freq[ch] = freq.get(ch, 0) + 1
+    entropy = 0.0
+    for count in freq.values():
+        p = count / length
+        entropy -= p * math.log2(p)
+    return entropy
+
+def compute_max_repeat_run(digits: str) -> int:
+    if not digits: return 0
+    max_run = 1
+    curr_run = 1
+    for i in range(1, len(digits)):
+        if digits[i] == digits[i-1]:
+            curr_run += 1
+            if curr_run > max_run: max_run = curr_run
+        else:
+            curr_run = 1
+    return max_run
+
+def compute_sequential_runs(digits: str) -> Tuple[int, int]:
+    if not digits or len(digits) < 2: return 0, 0
+    max_asc = 1
+    curr_asc = 1
+    max_desc = 1
+    curr_desc = 1
+
+    for i in range(1, len(digits)):
+        diff = int(digits[i]) - int(digits[i-1])
+        if diff == 1:
+            curr_asc += 1
+            if curr_asc > max_asc: max_asc = curr_asc
+        else:
+            curr_asc = 1
+
+        if diff == -1:
+            curr_desc += 1
+            if curr_desc > max_desc: max_desc = curr_desc
+        else:
+            curr_desc = 1
+
+    return max_asc, max_desc
+
+def compute_alternating_density(digits: str) -> float:
+    if not digits or len(digits) < 4: return 0.0
+    count = 0
+    for i in range(len(digits) - 2):
+        if digits[i] == digits[i+2] and digits[i] != digits[i+1]: count += 1
+    return min(count / float(len(digits) - 2), 1.0)
+
+def compute_repeated_block_density(digits: str) -> float:
+    if not digits or len(digits) < 4: return 0.0
+    for i in range(len(digits) - 3):
+        if digits[i:i+2] == digits[i+2:i+4]: return 1.0
+    for i in range(len(digits) - 5):
+        if digits[i:i+3] == digits[i+3:i+6]: return 1.0
+    return 0.0
+
+def compute_palindrome_symmetry(digits: str) -> float:
+    if not digits or len(digits) < 2: return 0.0
+    rev = digits[::-1]
+    matches = sum(1 for a, b in zip(digits, rev) if a == b)
+    return matches / float(len(digits))
+
+def parse_number_structure(raw_number: str, default_country: str) -> Tuple[str, str, int, bool]:
+    cleaned = re.sub(r"[^\d+]", "", raw_number.strip())
+    only_digits = re.sub(r"[^\d]", "", raw_number.strip())
+
+    if only_digits in EMERGENCY_SHORTCODES:
+        return default_country, only_digits, len(only_digits), True
+
+    # Wangiri check
+    for wp in WANGIRI_PREFIXES:
+        if cleaned.startswith(f"+{wp}") or only_digits.startswith(wp):
+            nat = only_digits[len(wp):] if len(only_digits) > len(wp) else only_digits
+            return wp, nat, 10, True
+
+    if cleaned.startswith("+91") or (default_country == "IN" and len(only_digits) >= 10):
+        country_code = "91"
+        nat_num = only_digits[2:] if cleaned.startswith("+91") or (only_digits.startswith("91") and len(only_digits) == 12) else only_digits[-10:]
+        return country_code, nat_num, 10, True
+    elif cleaned.startswith("+1") or (default_country == "US" and len(only_digits) == 10):
+        country_code = "1"
+        nat_num = only_digits[1:] if cleaned.startswith("+1") or (only_digits.startswith("1") and len(only_digits) == 11) else only_digits[-10:]
+        return country_code, nat_num, 10, True
+    elif cleaned.startswith("+44") or default_country == "GB":
+        country_code = "44"
+        nat_num = only_digits[2:] if cleaned.startswith("+44") or (only_digits.startswith("44") and len(only_digits) == 12) else only_digits[-10:]
+        return country_code, nat_num, 10, True
+    else:
+        country_code = only_digits[:3] if len(only_digits) >= 3 else only_digits
+        nat_num = only_digits[3:] if len(only_digits) > 3 else only_digits
+        return country_code, nat_num, 10, (7 <= len(only_digits) <= 15)
+
+def extract_features_from_number(raw_number: str, default_country: str = "IN") -> np.ndarray:
+    vec = np.zeros(FEATURE_SPEC["num_features"], dtype=np.float32)
+    cleaned = re.sub(r"[^\d+]", "", raw_number.strip())
+    only_digits = re.sub(r"[^\d]", "", raw_number.strip())
+
+    if not only_digits: return vec
+
+    country_code_str, nat_num_str, std_length, is_valid = parse_number_structure(raw_number, default_country)
+    nat_len = len(nat_num_str)
+    full_e164 = f"+{country_code_str}{nat_num_str}"
+
+    # 0. Validity
+    vec[0] = 1.0 if is_valid else 0.0
+
+    # 1. National length normalized
+    vec[1] = min(nat_len / 15.0, 1.0)
+
+    # 2. Length discrepancy
+    vec[2] = min(abs(nat_len - std_length) / 15.0, 1.0)
+
+    # 3. Shannon Entropy
+    entropy = compute_shannon_entropy(nat_num_str)
+    vec[3] = min(entropy / 3.321928, 1.0)
+
+    # 4. Unique ratio
+    vec[4] = (len(set(nat_num_str)) / float(nat_len)) if nat_len > 0 else 0.0
+
+    # 5. Max repeat run
+    max_run = compute_max_repeat_run(nat_num_str)
+    vec[5] = min(max_run / 10.0, 1.0)
+
+    # 6 & 7. Sequential runs (asc / desc)
+    max_asc, max_desc = compute_sequential_runs(nat_num_str)
+    vec[6] = min(max_asc / 10.0, 1.0)
+    vec[7] = min(max_desc / 10.0, 1.0)
+
+    # 8. Alternating density
+    vec[8] = compute_alternating_density(nat_num_str)
+
+    # 9. Repeated block density
+    vec[9] = compute_repeated_block_density(nat_num_str)
+
+    # 10. Palindrome symmetry
+    vec[10] = compute_palindrome_symmetry(nat_num_str)
+
+    # 11. Trailing zeros
+    trailing_zeros = len(nat_num_str) - len(nat_num_str.rstrip("0"))
+    vec[11] = min(trailing_zeros / 8.0, 1.0)
+
+    # 12. Leading digit distribution anomaly
+    if nat_len > 0 and nat_num_str[0] in ("0", "1") and country_code_str in ("1", "91") and only_digits not in EMERGENCY_SHORTCODES:
+        vec[12] = 1.0
+    else:
+        vec[12] = 0.0
+
+    # 13 - 19. Number Type Metadata
+    is_tollfree = nat_num_str.startswith("1800") or nat_num_str.startswith("800") or nat_num_str.startswith("888") or nat_num_str.startswith("877") or nat_num_str.startswith("866") or nat_num_str.startswith("855") or nat_num_str.startswith("844")
+    is_premium = nat_num_str.startswith("1900") or nat_num_str.startswith("900") or nat_num_str.startswith("0900")
+    is_voip = nat_num_str.startswith("140") or nat_num_str.startswith("843")
+    is_mobile = (nat_len == 10 and nat_num_str[0] in ("6", "7", "8", "9") and country_code_str == "91") or (nat_len == 10 and country_code_str == "1")
+    is_fixed = not is_mobile and not is_tollfree and not is_premium
+    is_uan = nat_num_str.startswith("140") or only_digits in EMERGENCY_SHORTCODES
+
+    vec[13] = 1.0 if is_tollfree else 0.0
+    vec[14] = 1.0 if is_premium else 0.0
+    vec[15] = 0.0
+    vec[16] = 1.0 if is_voip else 0.0
+    vec[17] = 1.0 if is_mobile else 0.0
+    vec[18] = 1.0 if is_fixed else 0.0
+    vec[19] = 1.0 if is_uan else 0.0
+
+    # 20. Wangiri High Cost Prefix
+    is_wangiri = (country_code_str in WANGIRI_PREFIXES) or any(only_digits.startswith(wp) for wp in WANGIRI_PREFIXES)
+    vec[20] = 1.0 if is_wangiri else 0.0
+
+    # 21. Telemarketing series
+    is_telemarketing = any(re.search(pat, full_e164) or re.search(pat, cleaned) for pat in TELEMARKETING_PREFIXES)
+    vec[21] = 1.0 if is_telemarketing else 0.0
+
+    # 22. Unallocated exchange code
+    is_unallocated = False
+    if country_code_str == "1" and nat_len == 10:
+        nxx = nat_num_str[3:6]
+        if nxx.endswith("11") or nxx == "555": is_unallocated = True
+    vec[22] = 1.0 if is_unallocated else 0.0
+
+    # 23. Shortcode formatted as E.164
+    vec[23] = 1.0 if (nat_len <= 6 and cleaned.startswith("+")) else 0.0
+
+    # 24. Hard Negative: Legitimate bank support pattern
+    is_bank = any(re.search(bp, full_e164) or re.search(bp, cleaned) for bp in LEGITIMATE_BANK_PATTERNS)
+    vec[24] = 1.0 if is_bank else 0.0
+
+    # 25. Hard Negative: Emergency service
+    vec[25] = 1.0 if (only_digits in EMERGENCY_SHORTCODES or nat_num_str in EMERGENCY_SHORTCODES) else 0.0
+
+    # 26. Same country
+    same_country = (default_country == "IN" and country_code_str == "91") or \
+                   (default_country == "US" and country_code_str == "1") or \
+                   (default_country == "GB" and country_code_str == "44")
+    vec[26] = 1.0 if same_country else 0.0
+
+    # 27. Country risk tier
+    if is_wangiri: vec[27] = 1.0
+    elif country_code_str in ("91", "1", "44", "61", "49", "33", "81"): vec[27] = 0.10
+    else: vec[27] = 0.40
+
+    # 28. Joint: Wangiri Callback Trap
+    vec[28] = 1.0 if (is_wangiri and (vec[3] < 0.70 or vec[2] > 0.0)) else 0.0
+
+    # 29. Joint: VoIP Robocall Pattern
+    vec[29] = 1.0 if (is_voip and (vec[5] >= 0.30 or vec[8] >= 0.30 or vec[6] >= 0.30)) else 0.0
+
+    # 30. Joint: Spoofed Short Dialer
+    vec[30] = 1.0 if (vec[2] >= 0.20 and (is_premium or is_unallocated)) else 0.0
+
+    # 31. Joint: Telemarketer Block
+    vec[31] = 1.0 if (is_telemarketing and vec[4] <= 0.70) else 0.0
+
+    # 32. Digit variance density
+    if nat_len > 0:
+        counts = [nat_num_str.count(str(d)) for d in range(10)]
+        var = float(np.var(counts))
+        vec[32] = min(var / 5.0, 1.0)
+
+    # 33. Consecutive diff sum
+    if nat_len > 1:
+        diff_sum = sum(abs(int(nat_num_str[i]) - int(nat_num_str[i-1])) for i in range(1, nat_len))
+        vec[33] = min(diff_sum / (9.0 * (nat_len - 1)), 1.0)
+
+    # 34 & 35
+    vec[34] = 0.0
+    vec[35] = 0.0
+
+    return vec
+
+def explain_prediction(features: np.ndarray, importances: np.ndarray, top_k: int = 3) -> List[Tuple[str, str, float]]:
+    active_indices = np.where(features > 0.0)[0]
+    scored = []
+    for idx in active_indices:
+        feat_meta = FEATURE_SPEC["features"][idx]
+        imp = importances[idx] if idx < len(importances) else 0.01
+        impact = float(features[idx] * imp)
+        scored.append((feat_meta["name"], feat_meta["description"], impact))
+    scored.sort(key=lambda x: x[2], reverse=True)
+    return scored[:top_k]

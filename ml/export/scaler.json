@@ -1,0 +1,331 @@
+{
+  "num_features": 36,
+  "scaling_type": "min_max_normalization",
+  "description": "Deterministic scaling parameters for AEGIS Phone Number Pattern Risk Model",
+  "features": [
+    {
+      "index": 0,
+      "name": "num_is_valid_e164",
+      "category": "validity",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 1,
+      "name": "num_national_length_normalized",
+      "category": "length",
+      "type": "continuous",
+      "scale_divisor": 15.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 2,
+      "name": "num_length_discrepancy",
+      "category": "length",
+      "type": "continuous",
+      "scale_divisor": 15.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 3,
+      "name": "digit_shannon_entropy",
+      "category": "entropy",
+      "type": "continuous",
+      "scale_divisor": 3.321928,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 4,
+      "name": "digit_unique_ratio",
+      "category": "entropy",
+      "type": "continuous",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 5,
+      "name": "digit_max_repeat_run",
+      "category": "repetition",
+      "type": "continuous",
+      "scale_divisor": 10.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 6,
+      "name": "digit_max_sequential_asc",
+      "category": "sequential",
+      "type": "continuous",
+      "scale_divisor": 10.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 7,
+      "name": "digit_max_sequential_desc",
+      "category": "sequential",
+      "type": "continuous",
+      "scale_divisor": 10.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 8,
+      "name": "digit_alternating_pattern_density",
+      "category": "symmetry",
+      "type": "continuous",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 9,
+      "name": "digit_repeated_block_density",
+      "category": "symmetry",
+      "type": "continuous",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 10,
+      "name": "digit_palindrome_symmetry",
+      "category": "symmetry",
+      "type": "continuous",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 11,
+      "name": "digit_trailing_zeros_count",
+      "category": "vanity",
+      "type": "continuous",
+      "scale_divisor": 8.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 12,
+      "name": "digit_leading_digit_distribution",
+      "category": "anomaly",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 13,
+      "name": "plan_is_tollfree",
+      "category": "number_type",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 14,
+      "name": "plan_is_premium_rate",
+      "category": "number_type",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 15,
+      "name": "plan_is_shared_cost",
+      "category": "number_type",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 16,
+      "name": "plan_is_voip_virtual",
+      "category": "number_type",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 17,
+      "name": "plan_is_mobile",
+      "category": "number_type",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 18,
+      "name": "plan_is_fixed_line",
+      "category": "number_type",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 19,
+      "name": "plan_is_uan_shortcode",
+      "category": "number_type",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 20,
+      "name": "risk_wangiri_high_cost_prefix",
+      "category": "risk_prefix",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 21,
+      "name": "risk_telemarketing_series",
+      "category": "risk_prefix",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 22,
+      "name": "risk_unallocated_exchange_code",
+      "category": "risk_prefix",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 23,
+      "name": "risk_short_code_spoofing",
+      "category": "risk_prefix",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 24,
+      "name": "hard_neg_legitimate_bank_support",
+      "category": "hard_negative",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 25,
+      "name": "hard_neg_emergency_service",
+      "category": "hard_negative",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 26,
+      "name": "geo_is_same_country",
+      "category": "provenance",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 27,
+      "name": "geo_country_risk_tier",
+      "category": "provenance",
+      "type": "continuous",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 28,
+      "name": "joint_wangiri_callback_trap",
+      "category": "joint_signature",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 29,
+      "name": "joint_voip_robocall_pattern",
+      "category": "joint_signature",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 30,
+      "name": "joint_spoofed_short_dialer",
+      "category": "joint_signature",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 31,
+      "name": "joint_telemarketer_block",
+      "category": "joint_signature",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 32,
+      "name": "digit_variance_density",
+      "category": "distribution",
+      "type": "continuous",
+      "scale_divisor": 5.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 33,
+      "name": "digit_consecutive_diff_sum",
+      "category": "sequence",
+      "type": "continuous",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 34,
+      "name": "plan_is_personal_number",
+      "category": "number_type",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    },
+    {
+      "index": 35,
+      "name": "plan_is_pager",
+      "category": "number_type",
+      "type": "binary",
+      "scale_divisor": 1.0,
+      "min_val": 0.0,
+      "max_val": 1.0
+    }
+  ]
+}

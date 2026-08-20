@@ -1,0 +1,72 @@
+[
+  {
+    "name": "State Bank of India Customer Care",
+    "number": "+911800112211",
+    "country": "IN",
+    "expected_tier": "LEGITIMATE",
+    "expected_max_risk": 0.15
+  },
+  {
+    "name": "SBI Alternate Care",
+    "number": "+9118004253800",
+    "country": "IN",
+    "expected_tier": "LEGITIMATE",
+    "expected_max_risk": 0.15
+  },
+  {
+    "name": "HDFC Bank Priority Support",
+    "number": "+9118002026161",
+    "country": "IN",
+    "expected_tier": "LEGITIMATE",
+    "expected_max_risk": 0.15
+  },
+  {
+    "name": "ICICI Bank Phone Banking",
+    "number": "+9118001080",
+    "country": "IN",
+    "expected_tier": "LEGITIMATE",
+    "expected_max_risk": 0.15
+  },
+  {
+    "name": "Chase Bank Customer Support",
+    "number": "+18009359935",
+    "country": "US",
+    "expected_tier": "LEGITIMATE",
+    "expected_max_risk": 0.15
+  },
+  {
+    "name": "Bank of America Help Line",
+    "number": "+18004321000",
+    "country": "US",
+    "expected_tier": "LEGITIMATE",
+    "expected_max_risk": 0.15
+  },
+  {
+    "name": "Wells Fargo Banking Line",
+    "number": "+18008693557",
+    "country": "US",
+    "expected_tier": "LEGITIMATE",
+    "expected_max_risk": 0.15
+  },
+  {
+    "name": "India National Emergency",
+    "number": "112",
+    "country": "IN",
+    "expected_tier": "LEGITIMATE",
+    "expected_max_risk": 0.1
+  },
+  {
+    "name": "US Emergency Services",
+    "number": "911",
+    "country": "US",
+    "expected_tier": "LEGITIMATE",
+    "expected_max_risk": 0.1
+  },
+  {
+    "name": "UK Emergency Line",
+    "number": "999",
+    "country": "GB",
+    "expected_tier": "LEGITIMATE",
+    "expected_max_risk": 0.1
+  }
+]
