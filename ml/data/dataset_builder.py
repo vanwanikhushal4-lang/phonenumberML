@@ -1,13 +1,6 @@
-"""
+﻿"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2)
-Production Data Engineering Pipeline with Grounded Telecom Provenance & Strict Zero Leakage
-
-Generates:
-1. train_dataset.json (10,000 deduplicated samples)
-2. val_dataset.json (2,500 deduplicated samples)
-3. test_untouched_holdout.json (2,500 untouched holdout samples with 0 overlap)
-4. natural_prevalence_benchmark.json (5,000 samples under natural operational prevalence)
-5. hard_negatives.json (Curated real-world certified bank customer care & emergency lines)
+Production Grounded Dataset Generator with Strict Prefix-Family Partitioning & Zero Leakage
 """
 
 import os
@@ -15,38 +8,38 @@ import sys
 import json
 import random
 import re
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Set
 import numpy as np
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-from ml.features.extractor import normalize_and_parse, extract_features_from_number
+from ml.features.extractor import normalize_and_parse
 
 DATA_DIR = os.path.dirname(__file__)
 
 COUNTRIES = ["IN", "US", "GB", "CA", "AU", "DE", "FR", "BR", "NG", "ID", "JP"]
 
-# Authoritative Carrier / Regulatory Allocation Blocks
-# India Mobile Series by Operator
-INDIA_OPERATOR_BLOCKS = {
+# Grounded Operator Allocations
+INDIA_OPERATORS = {
     "Jio": ["600", "700", "701", "702", "797", "798", "799", "808", "809", "897", "898", "899"],
     "Airtel": ["981", "982", "983", "984", "985", "986", "987", "988", "989", "991", "992", "993", "994", "995"],
     "Vi": ["971", "972", "973", "974", "975", "976", "977", "978", "979", "901", "902", "903", "904"],
     "BSNL": ["941", "942", "943", "944", "945", "946", "947", "948", "949", "940"]
 }
 
-# TRAI Commercial Telemarketing (140) & Transactional (160) series
-TRAI_140_PREFIXES = ["1400", "1401", "1402", "1403", "1404", "1405", "1406", "1407", "1408", "1409"]
-TRAI_160_PREFIXES = ["1600", "1601", "1602", "1603"]
+# Distinct TRAI 140 commercial marketing series partitioned by split
+TRAI_140_TRAIN = ["1400", "1401", "1402", "1403", "1404", "1405"]
+TRAI_140_VAL   = ["1406", "1407"]
+TRAI_140_TEST  = ["1408", "1409"]
 
-# OFCOM Non-Geographic Bulk Dialer Series
-OFCOM_BULK_PREFIXES = ["0843", "0844", "0845", "0870", "0871", "0872"]
+# Distinct Wangiri international codes partitioned by split
+WANGIRI_TRAIN = ["881", "882", "247", "232", "252", "224"]
+WANGIRI_VAL   = ["255", "257", "269"]
+WANGIRI_TEST  = ["239", "245", "674", "688", "870"]
 
-# NANPA US Marketing & Toll-Free series
-NANPA_TOLLFREE_MARKETING = ["844", "855", "866"]
-NANPA_TOLLFREE_STANDARD  = ["800", "888", "877", "833"]
-
-# Wangiri High-Cost Satellite Codes
-WANGIRI_COUNTRIES = ["881", "882", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870"]
+# Distinct OFCOM bulk dialers partitioned by split
+OFCOM_TRAIN = ["0843", "0844"]
+OFCOM_VAL   = ["0845"]
+OFCOM_TEST  = ["0870", "0871"]
 
 def generate_random_digits(length: int) -> str:
     return "".join([str(random.randint(0, 9)) for _ in range(length)])
@@ -56,12 +49,12 @@ def generate_dataset_suite(seed=42):
     np.random.seed(seed)
 
     print("="*85)
-    print("      AEGIS-PNP2 REALISTIC DATASET GENERATION & ZERO-LEAKAGE PARTITIONING")
+    print("      AEGIS-PNP2 DATASET SUITE: GROUNDED TELECOM DATA & PREFIX PARTITIONING")
     print("="*85)
 
-    seen_numbers = set()
+    seen_numbers: Set[str] = set()
 
-    def generate_single_sample(target_label: str, split: str) -> Optional[Dict[str, Any]]:
+    def generate_sample(target_label: str, split: str) -> Optional[Dict[str, Any]]:
         country = random.choice(COUNTRIES)
         raw_num = ""
         category = ""
@@ -71,7 +64,8 @@ def generate_dataset_suite(seed=42):
         if target_label == "CONFIRMED_SCAM":
             sub = random.choice(["wangiri", "premium_fraud", "spoofed_satellite"])
             if sub == "wangiri":
-                code = random.choice(WANGIRI_COUNTRIES)
+                code_pool = WANGIRI_TEST if split in ("test", "benchmark") else (WANGIRI_VAL if split == "val" else WANGIRI_TRAIN)
+                code = random.choice(code_pool)
                 raw_num = f"+{code}{generate_random_digits(7)}"
                 category = "Wangiri High-Cost Trap"
                 desc = f"Wangiri toll fraud (Code +{code})"
@@ -81,7 +75,7 @@ def generate_dataset_suite(seed=42):
                 elif country == "FR": raw_num = f"+3389{generate_random_digits(7)}"
                 else: raw_num = f"+44900{generate_random_digits(6)}"
                 category = "Premium Rate Fraud"
-                desc = "High-charge premium rate number service"
+                desc = "High-charge premium rate service line"
             else:
                 raw_num = f"+881{generate_random_digits(8)}"
                 category = "Wangiri High-Cost Trap"
@@ -91,23 +85,25 @@ def generate_dataset_suite(seed=42):
         elif target_label == "TELEMARKETING_SPAM":
             sub = random.choice(["trai_140", "ofcom_bulk", "nanpa_marketing", "low_entropy_dialer", "sequential_robocall"])
             if sub == "trai_140":
-                pfx = random.choice(TRAI_140_PREFIXES)
+                pfx_pool = TRAI_140_TEST if split in ("test", "benchmark") else (TRAI_140_VAL if split == "val" else TRAI_140_TRAIN)
+                pfx = random.choice(pfx_pool)
                 raw_num = f"+91{pfx}{generate_random_digits(6)}"
                 country = "IN"
                 category = "Commercial Telemarketing"
-                desc = "Registered TRAI 140 commercial marketing series"
+                desc = f"Registered TRAI 140 telemarketing series ({pfx})"
             elif sub == "ofcom_bulk":
-                pfx = random.choice(OFCOM_BULK_PREFIXES)
+                pfx_pool = OFCOM_TEST if split in ("test", "benchmark") else (OFCOM_VAL if split == "val" else OFCOM_TRAIN)
+                pfx = random.choice(pfx_pool)
                 raw_num = f"+44{pfx[1:]}{generate_random_digits(7)}"
                 country = "GB"
                 category = "Commercial Telemarketing"
-                desc = f"OFCOM bulk automated dialer series ({pfx})"
+                desc = f"OFCOM bulk automated dialer ({pfx})"
             elif sub == "nanpa_marketing":
-                pfx = random.choice(NANPA_TOLLFREE_MARKETING)
+                pfx = random.choice(["844", "855", "866"])
                 raw_num = f"+1{pfx}{generate_random_digits(7)}"
                 country = "US"
                 category = "Commercial Telemarketing"
-                desc = f"US marketing dialer series (+1-{pfx})"
+                desc = f"US toll-free marketing dialer (+1-{pfx})"
             elif sub == "low_entropy_dialer":
                 d = str(random.randint(0, 9))
                 if country == "IN": raw_num = f"+91{d * 10}"
@@ -120,7 +116,7 @@ def generate_dataset_suite(seed=42):
                 elif country == "US": raw_num = f"+19876543210"
                 else: raw_num = f"+441212121212"
                 category = "Low-Entropy Automated Robocall"
-                desc = "Sequential / alternating automated dialer"
+                desc = "Sequential automated dialer"
             label_code = 2
 
         elif target_label == "INVALID":
@@ -135,8 +131,8 @@ def generate_dataset_suite(seed=42):
 
         elif target_label == "UNKNOWN":
             if country == "IN":
-                op = random.choice(list(INDIA_OPERATOR_BLOCKS.keys()))
-                pfx = random.choice(INDIA_OPERATOR_BLOCKS[op])
+                op = random.choice(list(INDIA_OPERATORS.keys()))
+                pfx = random.choice(INDIA_OPERATORS[op])
                 raw_num = f"+91{pfx}{generate_random_digits(7)}"
                 desc = f"Standard Indian mobile subscriber ({op})"
             elif country == "US":
@@ -170,7 +166,7 @@ def generate_dataset_suite(seed=42):
             category = "Standard Mobile Line"
             label_code = 1
 
-        else: # BENIGN (Certified Bank Care, Emergency, PSTN)
+        else: # BENIGN
             sub = random.choice(["bank_care", "emergency", "pstn_landline"])
             if sub == "bank_care":
                 pfx = random.choice(["+911800", "+1800", "+44800", "+611800"])
@@ -194,7 +190,6 @@ def generate_dataset_suite(seed=42):
                 desc = f"Standard PSTN landline ({country})"
             label_code = 0
 
-        # Normalization and Deduplication check
         e164, cc, nat, std_l, is_v = normalize_and_parse(raw_num, country)
         norm_key = e164 if e164 else raw_num
 
@@ -221,33 +216,33 @@ def generate_dataset_suite(seed=42):
         weights = list(target_distribution.values())
 
         attempts = 0
-        while len(samples) < n_samples and attempts < n_samples * 20:
+        while len(samples) < n_samples and attempts < n_samples * 30:
             attempts += 1
             chosen_label = random.choices(labels, weights=weights, k=1)[0]
-            s = generate_single_sample(chosen_label, split_name)
+            s = generate_sample(chosen_label, split_name)
             if s is not None:
                 samples.append(s)
 
         random.shuffle(samples)
         return samples
 
-    # 1. Training Set (10,000 balanced samples across classes)
+    # 1. Train Set (10,000)
     train_dist = {"BENIGN": 0.25, "UNKNOWN": 0.25, "TELEMARKETING_SPAM": 0.25, "CONFIRMED_SCAM": 0.20, "INVALID": 0.05}
     train_samples = build_split(10000, train_dist, "train")
 
-    # 2. Validation Set (2,500 balanced samples)
+    # 2. Validation Set (2,500)
     val_dist = {"BENIGN": 0.25, "UNKNOWN": 0.25, "TELEMARKETING_SPAM": 0.25, "CONFIRMED_SCAM": 0.20, "INVALID": 0.05}
     val_samples = build_split(2500, val_dist, "val")
 
-    # 3. Untouched Test Holdout (2,500 samples with 0 overlap)
+    # 3. Untouched Frozen Holdout Test Set (2,500)
     test_dist = {"BENIGN": 0.25, "UNKNOWN": 0.25, "TELEMARKETING_SPAM": 0.25, "CONFIRMED_SCAM": 0.20, "INVALID": 0.05}
     test_samples = build_split(2500, test_dist, "test")
 
-    # 4. Natural Operational Prevalence Benchmark (5,000 samples: 85% Benign/Unknown, 10% Spam, 5% Scam)
+    # 4. Natural Prevalence Benchmark (5,000: 85% Benign/Unknown, 10% Telemarketing, 5% Scam)
     prev_dist = {"BENIGN": 0.45, "UNKNOWN": 0.40, "TELEMARKETING_SPAM": 0.10, "CONFIRMED_SCAM": 0.05}
     prev_samples = build_split(5000, prev_dist, "benchmark")
 
-    # 5. Certified Hard Negatives
+    # 5. Certified Bank Customer Care & Emergency Lines
     hard_negatives = [
         {"name": "State Bank of India Customer Care", "number": "+911800112211", "country": "IN", "expected_tier": "LEGITIMATE", "expected_max_risk": 0.10},
         {"name": "SBI Alternate Care", "number": "+9118004253800", "country": "IN", "expected_tier": "LEGITIMATE", "expected_max_risk": 0.10},

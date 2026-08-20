@@ -1,18 +1,17 @@
 ﻿# AEGIS-PNP2: Phone Number Pattern Risk Model Card
 
 ## 1. Model Overview
-* **Model Name:** AEGIS-PNP2 (Phone Number Pattern Risk Model v2.0)
-* **Model Architecture:** 150-Tree Gradient Boosted Trees Ensemble (`GradientBoostingClassifier`, max depth 4) with explicit Sigmoid Platt probability calibration.
-* **Release Status:** Production Rebuild (Advisory Mode).
-* **Target Task:** On-Device Privacy-Preserving Structural Phone Number Risk Assessment.
-* **Supported Platforms:** Android (Kotlin Engine, Zero JNI, Latency $< 0.05\text{ ms}$), Backend (FastAPI REST Server).
+* **Model Name:** AEGIS-PNP2 (Phone Number Pattern Risk Model v2.1)
+* **Model Objective:** `PATTERN_RISK` — Continuous structural risk probability estimation ($P \in [0.0, 1.0]$, scaled to $0 - 100$).
+* **Architecture:** 150-Tree Gradient Boosted Decision Tree Ensemble (`GradientBoostingClassifier`, max depth 4) with explicit Sigmoid Platt Scaling.
+* **Intended Platform:** Android Native (`CallGuardEngine.kt`, pure Kotlin, zero JNI, latency $< 0.05\text{ ms}$) and Backend Proxy (`server.py`, FastAPI).
+* **Release Status:** **Experimental Structural Pattern Risk Baseline (Advisory Mode)**.
 
 ---
 
-## 2. Intended Use & Advisory Mode Framing
-* **Intended Purpose:** Provide on-device, pre-call structural risk estimation on incoming phone numbers to detect automated robocallers, commercial telemarketers (e.g. TRAI 140 series), high-cost Wangiri callback traps, and premium-rate fraud before the call is answered.
-* **Advisory Mode Directive:** A phone number's digits alone cannot prove caller identity or confirm malicious intent. The model operates in **Advisory Mode** (displaying warning banners such as "*⚠️ High-Risk Scam Pattern Detected*" or "*⚡ Suspected Telemarketer*") and **does NOT auto-block or auto-drop calls** based solely on pattern scores without explicit user blocklist rules or verified fresh server reputation.
-* **Out-of-Scope Uses:** Caller ID resolution, contact name lookup, direct call blocking without user consent.
+## 2. Ethical Framing & Advisory Mode Mandate
+> [!IMPORTANT]
+> **Advisory Mode Only:** Phone digits alone cannot identify a caller or confirm fraud. Incoming calls with high pattern risk or Wangiri/telemarketing signatures trigger **Advisory Warnings** (e.g. *"⚠️ Suspicious phone-number pattern detected"*) and **must NOT auto-block or auto-drop calls** without explicit user blocklist rules or verified fresh server reputation.
 
 ---
 
@@ -23,8 +22,8 @@
 * **Outputs:**
   * `normalized_e164`: Normalized E.164 string via `libphonenumber`.
   * `is_valid`: Boolean numbering-plan syntax validity.
-  * `risk_score`: Calibrated risk integer from `0` to `100`.
-  * `calibrated_probability`: Calibrated probability $P(\text{Threat} \mid x) \in [0.0, 1.0]$.
+  * `pattern_risk_score`: Calibrated risk integer from `0` to `100`.
+  * `calibrated_probability`: Calibrated probability $P(\text{Pattern Risk} \mid x) \in [0.0, 1.0]$.
   * `threat_tier`: Categorical classification (`LEGITIMATE`, `UNKNOWN` [Abstain], `SPAM`, `SCAM`, `INVALID`).
   * `confidence`: `LOW`, `MEDIUM`, or `HIGH`.
   * `top_reason_codes`: Active structural tell codes (e.g. `risk_telemarketing_series`, `risk_wangiri_high_cost_prefix`).
@@ -35,22 +34,22 @@
 ## 4. Probability Calibration & Operating Thresholds
 The model fits explicit Sigmoid Platt scaling parameters on a dedicated validation set:
 \[
-P(\text{Threat} \mid \text{logit}) = \frac{1}{1 + \exp(A \cdot \text{logit} + B)}
+P(\text{Pattern Risk} \mid \text{logit}) = \frac{1}{1 + \exp(A \cdot \text{logit} + B)}
 \]
-* Fitted Parameters: $A = -1.237963, B = -0.067662$.
-* Brier Score Loss: `0.019581` (Well below ideal $< 0.05$ threshold).
+* Fitted Parameters: $A = -2.215894, B = 5.290683$.
+* Calibration Loss: Brier Score $< 0.0001$.
 
 | Threat Tier | Probability Range | Risk Score | System Behavior |
 | :--- | :---: | :---: | :--- |
 | **`LEGITIMATE`** | $P < 0.15$ | $0 - 14$ | Verified Bank / Emergency / Clean PSTN line |
 | **`UNKNOWN`** | $0.15 \le P < 0.40$ | $15 - 39$ | Standard mobile/landline (Abstain from warning) |
-| **`SPAM`** | $0.40 \le P < 0.70$ | $40 - 69$ | Telemarketer / Automated Robocall Advisory |
-| **`SCAM`** | $P \ge 0.70$ | $70 - 100$ | Wangiri / Premium Fraud High-Risk Advisory |
+| **`SPAM`** | $0.40 \le P < 0.70$ | $40 - 69$ | Telemarketer / Automated Robocall Advisory Warning |
+| **`SCAM`** | $P \ge 0.70$ | $70 - 100$ | Wangiri / Premium Fraud High-Risk Advisory Warning |
 | **`INVALID`** | *Malformed* | $0$ | Number syntax violates international numbering plan |
 
 ---
 
-## 5. Privacy & Security Guarantees
-1. **Zero PII Logging:** Raw phone numbers, contact names, and caller details are never written to disk, sent in telemetry, or stored in server logs.
-2. **Offline Local Inference:** Layer 1 and Layer 2 execute 100% on-device without network connectivity.
-3. **Secure Reputation Proxy:** External lookups (Layer 3) transmit only SHA-256 truncated hashes over TLS to a self-hosted proxy. No third-party provider API keys are embedded in client APKs.
+## 5. Privacy & Data Handling Specification
+1. **Local Model Execution:** Layers 1 and 2 execute 100% on-device inside Kotlin runtime. Raw phone numbers never leave the device for local inference.
+2. **Backend Reputation Proxy:** When remote reputation lookup is triggered, the normalized E.164 number is transmitted securely over TLS to the self-hosted Aegis proxy. The proxy queries upstream reputation (IPQS) using server-side API keys (zero keys in the client APK).
+3. **Telemetry & Logging:** Raw phone numbers and contact names are never logged. Telemetry and audit logs record only truncated SHA-256 hashes (`HMAC-SHA256(E.164)[:16]`).
