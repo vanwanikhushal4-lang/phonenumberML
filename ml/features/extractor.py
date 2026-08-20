@@ -15,28 +15,27 @@ SPEC_PATH = os.path.join(os.path.dirname(__file__), "feature_spec.json")
 with open(SPEC_PATH, "r", encoding="utf-8-sig") as f:
     FEATURE_SPEC = json.load(f)
 
-# High-Risk Wangiri & Revenue Sharing International Country / Area Codes
 WANGIRI_PREFIXES = {
     "881", "882", "883", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870", "871", "872", "873"
 }
 
-# Registered Commercial Telemarketing / Bulk Dialer Series
 TELEMARKETING_PREFIXES = [
     r"^\+?91140\d{7}$",
     r"^\+?4484[345]\d{7}$",
-    r"^\+?1(844|855|866|877|888)\d{7}$",
+    r"^\+?1(844|855|866)\d{7}$",
     r"^\+?3389\d{7}$",
 ]
 
-# Legitimate Bank / Financial Institutions Customer Care Patterns (Hard Negatives)
 LEGITIMATE_BANK_PATTERNS = [
-    r"^\+?911800(112211|4253800|2026161|1080|229090|1802222|2098800|1234|2100)\b",
-    r"^\+?1800(9359935|4321000|8693557|2882020|8291040)\b",
-    r"^\+?911800\d{4,7}$",
+    r"^\+?911800\d{4,8}$",
+    r"^\+?1800\d{7}$",
+    r"^\+?44800\d{6,8}$",
+    r"^\+?611800\d{6,8}$",
+    r"^\+?49800\d{6,8}$",
+    r"^\+?33800\d{6,8}$",
 ]
 
-# Emergency & Public Service Shortcodes
-EMERGENCY_SHORTCODES = {"112", "911", "999", "100", "101", "102", "108", "1091", "1930", "000"}
+EMERGENCY_SHORTCODES = {"112", "911", "999", "100", "101", "102", "108", "1091", "1930", "000", "110", "119", "17", "18"}
 
 def compute_shannon_entropy(digits: str) -> float:
     if not digits: return 0.0
@@ -113,7 +112,6 @@ def parse_number_structure(raw_number: str, default_country: str) -> Tuple[str, 
     if only_digits in EMERGENCY_SHORTCODES:
         return default_country, only_digits, len(only_digits), True
 
-    # Wangiri check
     for wp in WANGIRI_PREFIXES:
         if cleaned.startswith(f"+{wp}") or only_digits.startswith(wp):
             nat = only_digits[len(wp):] if len(only_digits) > len(wp) else only_digits
@@ -130,6 +128,34 @@ def parse_number_structure(raw_number: str, default_country: str) -> Tuple[str, 
     elif cleaned.startswith("+44") or default_country == "GB":
         country_code = "44"
         nat_num = only_digits[2:] if cleaned.startswith("+44") or (only_digits.startswith("44") and len(only_digits) == 12) else only_digits[-10:]
+        return country_code, nat_num, 10, True
+    elif cleaned.startswith("+33") or default_country == "FR":
+        country_code = "33"
+        nat_num = only_digits[2:] if cleaned.startswith("+33") or (only_digits.startswith("33") and len(only_digits) >= 10) else only_digits[-9:]
+        return country_code, nat_num, 9, True
+    elif cleaned.startswith("+49") or default_country == "DE":
+        country_code = "49"
+        nat_num = only_digits[2:] if cleaned.startswith("+49") or (only_digits.startswith("49") and len(only_digits) >= 11) else only_digits[-10:]
+        return country_code, nat_num, 10, True
+    elif cleaned.startswith("+61") or default_country == "AU":
+        country_code = "61"
+        nat_num = only_digits[2:] if cleaned.startswith("+61") or (only_digits.startswith("61") and len(only_digits) >= 10) else only_digits[-9:]
+        return country_code, nat_num, 9, True
+    elif cleaned.startswith("+81") or default_country == "JP":
+        country_code = "81"
+        nat_num = only_digits[2:] if cleaned.startswith("+81") or (only_digits.startswith("81") and len(only_digits) >= 11) else only_digits[-10:]
+        return country_code, nat_num, 10, True
+    elif cleaned.startswith("+55") or default_country == "BR":
+        country_code = "55"
+        nat_num = only_digits[2:] if cleaned.startswith("+55") or (only_digits.startswith("55") and len(only_digits) >= 12) else only_digits[-11:]
+        return country_code, nat_num, 11, True
+    elif cleaned.startswith("+62") or default_country == "ID":
+        country_code = "62"
+        nat_num = only_digits[2:] if cleaned.startswith("+62") or (only_digits.startswith("62") and len(only_digits) >= 11) else only_digits[-10:]
+        return country_code, nat_num, 10, True
+    elif cleaned.startswith("+234") or default_country == "NG":
+        country_code = "234"
+        nat_num = only_digits[3:] if cleaned.startswith("+234") or (only_digits.startswith("234") and len(only_digits) >= 13) else only_digits[-10:]
         return country_code, nat_num, 10, True
     else:
         country_code = only_digits[:3] if len(only_digits) >= 3 else only_digits
@@ -186,16 +212,16 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
     vec[11] = min(trailing_zeros / 8.0, 1.0)
 
     # 12. Leading digit distribution anomaly
-    if nat_len > 0 and nat_num_str[0] in ("0", "1") and country_code_str in ("1", "91") and only_digits not in EMERGENCY_SHORTCODES:
+    if nat_len > 0 and nat_num_str[0] in ("0", "1") and country_code_str in ("1", "91") and only_digits not in EMERGENCY_SHORTCODES and not nat_num_str.startswith("1800") and not nat_num_str.startswith("1900") and not nat_num_str.startswith("140"):
         vec[12] = 1.0
     else:
         vec[12] = 0.0
 
     # 13 - 19. Number Type Metadata
     is_tollfree = nat_num_str.startswith("1800") or nat_num_str.startswith("800") or nat_num_str.startswith("888") or nat_num_str.startswith("877") or nat_num_str.startswith("866") or nat_num_str.startswith("855") or nat_num_str.startswith("844")
-    is_premium = nat_num_str.startswith("1900") or nat_num_str.startswith("900") or nat_num_str.startswith("0900")
+    is_premium = (nat_num_str.startswith("1900") or (country_code_str == "1" and nat_num_str.startswith("900")) or (country_code_str == "44" and nat_num_str.startswith("900")) or (country_code_str == "33" and nat_num_str.startswith("89")))
     is_voip = nat_num_str.startswith("140") or nat_num_str.startswith("843")
-    is_mobile = (nat_len == 10 and nat_num_str[0] in ("6", "7", "8", "9") and country_code_str == "91") or (nat_len == 10 and country_code_str == "1")
+    is_mobile = (nat_len == 10 and nat_num_str[0] in ("6", "7", "8", "9") and country_code_str == "91") or (nat_len == 10 and country_code_str == "1" and not is_tollfree and not is_premium) or (country_code_str == "44" and nat_num_str.startswith("7")) or (country_code_str == "81" and nat_num_str.startswith(("90", "80", "70")))
     is_fixed = not is_mobile and not is_tollfree and not is_premium
     is_uan = nat_num_str.startswith("140") or only_digits in EMERGENCY_SHORTCODES
 
@@ -226,7 +252,7 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
     vec[23] = 1.0 if (nat_len <= 6 and cleaned.startswith("+")) else 0.0
 
     # 24. Hard Negative: Legitimate bank support pattern
-    is_bank = any(re.search(bp, full_e164) or re.search(bp, cleaned) for bp in LEGITIMATE_BANK_PATTERNS)
+    is_bank = is_tollfree or any(re.search(bp, full_e164) or re.search(bp, cleaned) for bp in LEGITIMATE_BANK_PATTERNS)
     vec[24] = 1.0 if is_bank else 0.0
 
     # 25. Hard Negative: Emergency service
@@ -235,19 +261,26 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
     # 26. Same country
     same_country = (default_country == "IN" and country_code_str == "91") or \
                    (default_country == "US" and country_code_str == "1") or \
-                   (default_country == "GB" and country_code_str == "44")
+                   (default_country == "GB" and country_code_str == "44") or \
+                   (default_country == "FR" and country_code_str == "33") or \
+                   (default_country == "DE" and country_code_str == "49") or \
+                   (default_country == "AU" and country_code_str == "61") or \
+                   (default_country == "JP" and country_code_str == "81") or \
+                   (default_country == "BR" and country_code_str == "55") or \
+                   (default_country == "ID" and country_code_str == "62") or \
+                   (default_country == "NG" and country_code_str == "234")
     vec[26] = 1.0 if same_country else 0.0
 
     # 27. Country risk tier
     if is_wangiri: vec[27] = 1.0
-    elif country_code_str in ("91", "1", "44", "61", "49", "33", "81"): vec[27] = 0.10
+    elif country_code_str in ("91", "1", "44", "61", "49", "33", "81", "55", "62", "234"): vec[27] = 0.10
     else: vec[27] = 0.40
 
     # 28. Joint: Wangiri Callback Trap
     vec[28] = 1.0 if (is_wangiri and (vec[3] < 0.70 or vec[2] > 0.0)) else 0.0
 
-    # 29. Joint: VoIP Robocall Pattern
-    vec[29] = 1.0 if (is_voip and (vec[5] >= 0.30 or vec[8] >= 0.30 or vec[6] >= 0.30)) else 0.0
+    # 29. Joint: Low-Entropy Robocall Pattern
+    vec[29] = 1.0 if ((vec[5] >= 0.50 or vec[6] >= 0.60 or vec[7] >= 0.60 or vec[8] >= 0.50) and vec[24] == 0.0 and vec[25] == 0.0) else 0.0
 
     # 30. Joint: Spoofed Short Dialer
     vec[30] = 1.0 if (vec[2] >= 0.20 and (is_premium or is_unallocated)) else 0.0

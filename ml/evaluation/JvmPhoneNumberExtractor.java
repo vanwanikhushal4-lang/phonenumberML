@@ -1,10 +1,6 @@
 import java.io.*;
 import java.util.*;
 
-/**
- * Pure Java 17 / JVM Feature Extractor for AEGIS Phone Number Pattern Risk Model (AEGIS-PNP1).
- * 100% Deterministic Parity with Python Extractor.
- */
 public class JvmPhoneNumberExtractor {
 
     private static final Set<String> WANGIRI_PREFIXES = new HashSet<>(Arrays.asList(
@@ -12,20 +8,23 @@ public class JvmPhoneNumberExtractor {
     ));
 
     private static final Set<String> EMERGENCY_SHORTCODES = new HashSet<>(Arrays.asList(
-        "112", "911", "999", "100", "101", "102", "108", "1091", "1930", "000"
+        "112", "911", "999", "100", "101", "102", "108", "1091", "1930", "000", "110", "119", "17", "18"
     ));
 
     private static final List<String> TELEMARKETING_PREFIXES = Arrays.asList(
         "^\\+?91140\\d{7}$",
         "^\\+?4484[345]\\d{7}$",
-        "^\\+?1(844|855|866|877|888)\\d{7}$",
+        "^\\+?1(844|855|866)\\d{7}$",
         "^\\+?3389\\d{7}$"
     );
 
     private static final List<String> LEGITIMATE_BANK_PATTERNS = Arrays.asList(
-        "^\\+?911800(112211|4253800|2026161|1080|229090|1802222|2098800|1234|2100).*",
-        "^\\+?1800(9359935|4321000|8693557|2882020|8291040).*",
-        "^\\+?911800\\d{4,7}$"
+        "^\\+?911800\\d{4,8}$",
+        "^\\+?1800\\d{7}$",
+        "^\\+?44800\\d{6,8}$",
+        "^\\+?611800\\d{6,8}$",
+        "^\\+?49800\\d{6,8}$",
+        "^\\+?33800\\d{6,8}$"
     );
 
     public static float[] extractFeatures(String rawNumber, String defaultCountry) {
@@ -73,6 +72,41 @@ public class JvmPhoneNumberExtractor {
                 } else if (cleaned.startsWith("+44") || defaultCountry.equals("GB")) {
                     countryCodeStr = "44";
                     natNumStr = cleaned.startsWith("+44") || (onlyDigits.startsWith("44") && onlyDigits.length() == 12) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                    stdLength = 10;
+                    isValid = true;
+                } else if (cleaned.startsWith("+33") || defaultCountry.equals("FR")) {
+                    countryCodeStr = "33";
+                    natNumStr = cleaned.startsWith("+33") || (onlyDigits.startsWith("33") && onlyDigits.length() >= 10) ? onlyDigits.substring(2) : (onlyDigits.length() >= 9 ? onlyDigits.substring(onlyDigits.length() - 9) : onlyDigits);
+                    stdLength = 9;
+                    isValid = true;
+                } else if (cleaned.startsWith("+49") || defaultCountry.equals("DE")) {
+                    countryCodeStr = "49";
+                    natNumStr = cleaned.startsWith("+49") || (onlyDigits.startsWith("49") && onlyDigits.length() >= 11) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                    stdLength = 10;
+                    isValid = true;
+                } else if (cleaned.startsWith("+61") || defaultCountry.equals("AU")) {
+                    countryCodeStr = "61";
+                    natNumStr = cleaned.startsWith("+61") || (onlyDigits.startsWith("61") && onlyDigits.length() >= 10) ? onlyDigits.substring(2) : (onlyDigits.length() >= 9 ? onlyDigits.substring(onlyDigits.length() - 9) : onlyDigits);
+                    stdLength = 9;
+                    isValid = true;
+                } else if (cleaned.startsWith("+81") || defaultCountry.equals("JP")) {
+                    countryCodeStr = "81";
+                    natNumStr = cleaned.startsWith("+81") || (onlyDigits.startsWith("81") && onlyDigits.length() >= 11) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                    stdLength = 10;
+                    isValid = true;
+                } else if (cleaned.startsWith("+55") || defaultCountry.equals("BR")) {
+                    countryCodeStr = "55";
+                    natNumStr = cleaned.startsWith("+55") || (onlyDigits.startsWith("55") && onlyDigits.length() >= 12) ? onlyDigits.substring(2) : (onlyDigits.length() >= 11 ? onlyDigits.substring(onlyDigits.length() - 11) : onlyDigits);
+                    stdLength = 11;
+                    isValid = true;
+                } else if (cleaned.startsWith("+62") || defaultCountry.equals("ID")) {
+                    countryCodeStr = "62";
+                    natNumStr = cleaned.startsWith("+62") || (onlyDigits.startsWith("62") && onlyDigits.length() >= 11) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                    stdLength = 10;
+                    isValid = true;
+                } else if (cleaned.startsWith("+234") || defaultCountry.equals("NG")) {
+                    countryCodeStr = "234";
+                    natNumStr = cleaned.startsWith("+234") || (onlyDigits.startsWith("234") && onlyDigits.length() >= 13) ? onlyDigits.substring(3) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
                     stdLength = 10;
                     isValid = true;
                 } else {
@@ -133,7 +167,7 @@ public class JvmPhoneNumberExtractor {
         vec[11] = Math.min((float) trailingZeros / 8.0f, 1.0f);
 
         // 12. Leading digit distribution anomaly
-        if (natLen > 0 && (natNumStr.charAt(0) == '0' || natNumStr.charAt(0) == '1') && (countryCodeStr.equals("1") || countryCodeStr.equals("91")) && !EMERGENCY_SHORTCODES.contains(onlyDigits)) {
+        if (natLen > 0 && (natNumStr.charAt(0) == '0' || natNumStr.charAt(0) == '1') && (countryCodeStr.equals("1") || countryCodeStr.equals("91")) && !EMERGENCY_SHORTCODES.contains(onlyDigits) && !natNumStr.startsWith("1800") && !natNumStr.startsWith("1900") && !natNumStr.startsWith("140")) {
             vec[12] = 1.0f;
         } else {
             vec[12] = 0.0f;
@@ -141,10 +175,12 @@ public class JvmPhoneNumberExtractor {
 
         // 13 - 19. Number Types
         boolean isTollfree = natNumStr.startsWith("1800") || natNumStr.startsWith("800") || natNumStr.startsWith("888") || natNumStr.startsWith("877") || natNumStr.startsWith("866") || natNumStr.startsWith("855") || natNumStr.startsWith("844");
-        boolean isPremium = natNumStr.startsWith("1900") || natNumStr.startsWith("900") || natNumStr.startsWith("0900");
+        boolean isPremium = (natNumStr.startsWith("1900") || (countryCodeStr.equals("1") && natNumStr.startsWith("900")) || (countryCodeStr.equals("44") && natNumStr.startsWith("900")) || (countryCodeStr.equals("33") && natNumStr.startsWith("89")));
         boolean isVoip = natNumStr.startsWith("140") || natNumStr.startsWith("843");
         boolean isMobile = (natLen == 10 && (natNumStr.charAt(0) == '6' || natNumStr.charAt(0) == '7' || natNumStr.charAt(0) == '8' || natNumStr.charAt(0) == '9') && countryCodeStr.equals("91")) ||
-                           (natLen == 10 && countryCodeStr.equals("1"));
+                           (natLen == 10 && countryCodeStr.equals("1") && !isTollfree && !isPremium) ||
+                           (countryCodeStr.equals("44") && natNumStr.startsWith("7")) ||
+                           (countryCodeStr.equals("81") && (natNumStr.startsWith("90") || natNumStr.startsWith("80") || natNumStr.startsWith("70")));
         boolean isFixed = !isMobile && !isTollfree && !isPremium;
         boolean isUan = natNumStr.startsWith("140") || EMERGENCY_SHORTCODES.contains(onlyDigits);
 
@@ -184,9 +220,11 @@ public class JvmPhoneNumberExtractor {
         vec[23] = (natLen <= 6 && cleaned.startsWith("+")) ? 1.0f : 0.0f;
 
         // 24. Hard Negative Bank
-        boolean isBank = false;
-        for (String bp : LEGITIMATE_BANK_PATTERNS) {
-            if (fullE164.matches(bp) || cleaned.matches(bp)) { isBank = true; break; }
+        boolean isBank = isTollfree;
+        if (!isBank) {
+            for (String bp : LEGITIMATE_BANK_PATTERNS) {
+                if (fullE164.matches(bp) || cleaned.matches(bp)) { isBank = true; break; }
+            }
         }
         vec[24] = isBank ? 1.0f : 0.0f;
 
@@ -196,19 +234,26 @@ public class JvmPhoneNumberExtractor {
         // 26. Same country
         boolean sameCountry = (defaultCountry.equals("IN") && countryCodeStr.equals("91")) ||
                               (defaultCountry.equals("US") && countryCodeStr.equals("1")) ||
-                              (defaultCountry.equals("GB") && countryCodeStr.equals("44"));
+                              (defaultCountry.equals("GB") && countryCodeStr.equals("44")) ||
+                              (defaultCountry.equals("FR") && countryCodeStr.equals("33")) ||
+                              (defaultCountry.equals("DE") && countryCodeStr.equals("49")) ||
+                              (defaultCountry.equals("AU") && countryCodeStr.equals("61")) ||
+                              (defaultCountry.equals("JP") && countryCodeStr.equals("81")) ||
+                              (defaultCountry.equals("BR") && countryCodeStr.equals("55")) ||
+                              (defaultCountry.equals("ID") && countryCodeStr.equals("62")) ||
+                              (defaultCountry.equals("NG") && countryCodeStr.equals("234"));
         vec[26] = sameCountry ? 1.0f : 0.0f;
 
         // 27. Country risk tier
         if (isWangiri) vec[27] = 1.0f;
-        else if (countryCodeStr.equals("91") || countryCodeStr.equals("1") || countryCodeStr.equals("44") || countryCodeStr.equals("61") || countryCodeStr.equals("49")) vec[27] = 0.10f;
+        else if (countryCodeStr.equals("91") || countryCodeStr.equals("1") || countryCodeStr.equals("44") || countryCodeStr.equals("61") || countryCodeStr.equals("49") || countryCodeStr.equals("33") || countryCodeStr.equals("81") || countryCodeStr.equals("55") || countryCodeStr.equals("62") || countryCodeStr.equals("234")) vec[27] = 0.10f;
         else vec[27] = 0.40f;
 
         // 28. Joint: Wangiri Trap
         vec[28] = (isWangiri && (vec[3] < 0.70f || vec[2] > 0.0f)) ? 1.0f : 0.0f;
 
-        // 29. Joint: VoIP Robocall
-        vec[29] = (isVoip && (vec[5] >= 0.30f || vec[8] >= 0.30f || vec[6] >= 0.30f)) ? 1.0f : 0.0f;
+        // 29. Joint: Low-Entropy Robocall
+        vec[29] = ((vec[5] >= 0.50f || vec[6] >= 0.60f || vec[7] >= 0.60f || vec[8] >= 0.50f) && vec[24] == 0.0f && vec[25] == 0.0f) ? 1.0f : 0.0f;
 
         // 30. Joint: Spoofed Short Dialer
         vec[30] = (vec[2] >= 0.20f && (isPremium || isUnallocated)) ? 1.0f : 0.0f;

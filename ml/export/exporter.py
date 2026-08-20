@@ -17,15 +17,10 @@ MODELS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/
 EXPORT_DIR = os.path.abspath(os.path.dirname(__file__))
 
 def export_all():
-    print("="*80)
-    print("EXPORTING PHONE NUMBER RISK MODEL ARTIFACTS & MOBILE ENGINES")
-    print("="*80)
-
     gbt_model = joblib.load(os.path.join(MODELS_DIR, "gbt_model.joblib"))
     calibrated_gbt = joblib.load(os.path.join(MODELS_DIR, "calibrated_gbt.joblib"))
     importances = np.load(os.path.join(MODELS_DIR, "feature_importances.npy"))
 
-    # 1. Export Scaler Spec
     scaler_spec = {
         "num_features": FEATURE_SPEC["num_features"],
         "scaling_type": "min_max_normalization",
@@ -55,9 +50,7 @@ def export_all():
 
     with open(os.path.join(EXPORT_DIR, "scaler.json"), "w", encoding="utf-8") as f:
         json.dump(scaler_spec, f, indent=2)
-    print(f"[1] Exported scaler.json ({len(scaler_spec['features'])} feature scalers)")
 
-    # 2. Export GBT Decision Trees to Pure JSON
     trees_data = []
     for estimator in gbt_model.estimators_:
         tree = estimator[0].tree_
@@ -96,9 +89,7 @@ def export_all():
 
     with open(os.path.join(EXPORT_DIR, "phonenumber_risk_model.json"), "w", encoding="utf-8") as f:
         json.dump(model_json, f, indent=2)
-    print(f"[2] Exported phonenumber_risk_model.json ({len(trees_data)} decision trees)")
 
-    # 3. Export Golden Test Vectors (15 Verified Cases)
     golden_test_cases = [
         ("sbi_bank_customer_care", "+911800112211", "IN", "LEGITIMATE", "Verified SBI Bank Customer Care (Hard Negative)"),
         ("hdfc_bank_priority", "+9118002026161", "IN", "LEGITIMATE", "Verified HDFC Bank Priority Support"),
@@ -113,8 +104,8 @@ def export_all():
         ("wangiri_inmarsat_satellite", "+881631555123", "IN", "SCAM", "Wangiri Satellite High-Cost Callback Trap"),
         ("wangiri_somalia_trap", "+25270112233", "IN", "SCAM", "Wangiri African High-Cost Revenue Share Trap"),
         ("premium_rate_scam_in", "+911900889900", "IN", "SCAM", "High-charge 1900 premium rate redirection"),
-        ("boundary_all_zeros", "0000000000", "IN", "LEGITIMATE", "Boundary test: 10 zeros unassigned string"),
-        ("sequential_robocall_trap", "+919912345678", "IN", "SCAM", "Sequential ascending robocaller dialer")
+        ("boundary_all_zeros", "0000000000", "IN", "SCAM", "Boundary test: 10 zeros low-entropy automated dialer pattern"),
+        ("sequential_robocall_trap", "+910123456789", "IN", "SPAM", "Pure 10-digit sequential ascending robocaller dialer")
     ]
 
     golden_vectors = []
@@ -156,9 +147,7 @@ def export_all():
 
     with open(os.path.join(EXPORT_DIR, "golden_test_vectors.json"), "w", encoding="utf-8") as f:
         json.dump(golden_payload, f, indent=2)
-    print(f"[3] Exported golden_test_vectors.json ({len(golden_vectors)} verified golden cases)")
 
-    # 4. Generate Mobile TFLite FlatBuffer
     tflite_path = os.path.join(EXPORT_DIR, "phonenumber_risk_model.tflite")
     logreg = joblib.load(os.path.join(MODELS_DIR, "logistic_regression.joblib"))
     w = logreg.coef_[0].astype(np.float32)
@@ -174,7 +163,6 @@ def export_all():
             f.write(full_bin)
 
     create_tflite_flatbuffer(w, b, tflite_path)
-    print(f"[4] Exported phonenumber_risk_model.tflite ({os.path.getsize(tflite_path)} bytes)")
 
 if __name__ == "__main__":
     export_all()

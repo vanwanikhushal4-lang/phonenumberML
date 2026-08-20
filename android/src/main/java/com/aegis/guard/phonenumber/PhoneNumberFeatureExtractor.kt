@@ -19,20 +19,23 @@ object PhoneNumberFeatureExtractor {
     )
 
     private val EMERGENCY_SHORTCODES = HashSet(
-        Arrays.asList("112", "911", "999", "100", "101", "102", "108", "1091", "1930", "000")
+        Arrays.asList("112", "911", "999", "100", "101", "102", "108", "1091", "1930", "000", "110", "119", "17", "18")
     )
 
     private val TELEMARKETING_REGEXES = listOf(
         Regex("^\\+?91140\\d{7}$"),
         Regex("^\\+?4484[345]\\d{7}$"),
-        Regex("^\\+?1(844|855|866|877|888)\\d{7}$"),
+        Regex("^\\+?1(844|855|866)\\d{7}$"),
         Regex("^\\+?3389\\d{7}$")
     )
 
     private val BANK_REGEXES = listOf(
-        Regex("^\\+?911800(112211|4253800|2026161|1080|229090|1802222|2098800|1234|2100).*"),
-        Regex("^\\+?1800(9359935|4321000|8693557|2882020|8291040).*"),
-        Regex("^\\+?911800\\d{4,7}$")
+        Regex("^\\+?911800\\d{4,8}$"),
+        Regex("^\\+?1800\\d{7}$"),
+        Regex("^\\+?44800\\d{6,8}$"),
+        Regex("^\\+?611800\\d{6,8}$"),
+        Regex("^\\+?49800\\d{6,8}$"),
+        Regex("^\\+?33800\\d{6,8}$")
     )
 
     fun extractFeatures(rawNumber: String?, defaultCountry: String = "IN"): FloatArray {
@@ -80,6 +83,41 @@ object PhoneNumberFeatureExtractor {
                 } else if (cleaned.startsWith("+44") || defaultCountry == "GB") {
                     countryCodeStr = "44"
                     natNumStr = if (cleaned.startsWith("+44") || (onlyDigits.startsWith("44") && onlyDigits.length == 12)) onlyDigits.substring(2) else (if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits)
+                    stdLength = 10
+                    isValid = true
+                } else if (cleaned.startsWith("+33") || defaultCountry == "FR") {
+                    countryCodeStr = "33"
+                    natNumStr = if (cleaned.startsWith("+33") || (onlyDigits.startsWith("33") && onlyDigits.length >= 10)) onlyDigits.substring(2) else (if (onlyDigits.length >= 9) onlyDigits.substring(onlyDigits.length - 9) else onlyDigits)
+                    stdLength = 9
+                    isValid = true
+                } else if (cleaned.startsWith("+49") || defaultCountry == "DE") {
+                    countryCodeStr = "49"
+                    natNumStr = if (cleaned.startsWith("+49") || (onlyDigits.startsWith("49") && onlyDigits.length >= 11)) onlyDigits.substring(2) else (if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits)
+                    stdLength = 10
+                    isValid = true
+                } else if (cleaned.startsWith("+61") || defaultCountry == "AU") {
+                    countryCodeStr = "61"
+                    natNumStr = if (cleaned.startsWith("+61") || (onlyDigits.startsWith("61") && onlyDigits.length >= 10)) onlyDigits.substring(2) else (if (onlyDigits.length >= 9) onlyDigits.substring(onlyDigits.length - 9) else onlyDigits)
+                    stdLength = 9
+                    isValid = true
+                } else if (cleaned.startsWith("+81") || defaultCountry == "JP") {
+                    countryCodeStr = "81"
+                    natNumStr = if (cleaned.startsWith("+81") || (onlyDigits.startsWith("81") && onlyDigits.length >= 11)) onlyDigits.substring(2) else (if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits)
+                    stdLength = 10
+                    isValid = true
+                } else if (cleaned.startsWith("+55") || defaultCountry == "BR") {
+                    countryCodeStr = "55"
+                    natNumStr = if (cleaned.startsWith("+55") || (onlyDigits.startsWith("55") && onlyDigits.length >= 12)) onlyDigits.substring(2) else (if (onlyDigits.length >= 11) onlyDigits.substring(onlyDigits.length - 11) else onlyDigits)
+                    stdLength = 11
+                    isValid = true
+                } else if (cleaned.startsWith("+62") || defaultCountry == "ID") {
+                    countryCodeStr = "62"
+                    natNumStr = if (cleaned.startsWith("+62") || (onlyDigits.startsWith("62") && onlyDigits.length >= 11)) onlyDigits.substring(2) else (if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits)
+                    stdLength = 10
+                    isValid = true
+                } else if (cleaned.startsWith("+234") || defaultCountry == "NG") {
+                    countryCodeStr = "234"
+                    natNumStr = if (cleaned.startsWith("+234") || (onlyDigits.startsWith("234") && onlyDigits.length >= 13)) onlyDigits.substring(3) else (if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits)
                     stdLength = 10
                     isValid = true
                 } else {
@@ -139,7 +177,7 @@ object PhoneNumberFeatureExtractor {
         vec[11] = min(trailingZeros.toFloat() / 8.0f, 1.0f)
 
         // 12. Leading digit distribution anomaly
-        if (natLen > 0 && (natNumStr[0] == '0' || natNumStr[0] == '1') && (countryCodeStr == "1" || countryCodeStr == "91") && !EMERGENCY_SHORTCODES.contains(onlyDigits)) {
+        if (natLen > 0 && (natNumStr[0] == '0' || natNumStr[0] == '1') && (countryCodeStr == "1" || countryCodeStr == "91") && !EMERGENCY_SHORTCODES.contains(onlyDigits) && !natNumStr.startsWith("1800") && !natNumStr.startsWith("1900") && !natNumStr.startsWith("140")) {
             vec[12] = 1.0f
         } else {
             vec[12] = 0.0f
@@ -147,9 +185,9 @@ object PhoneNumberFeatureExtractor {
 
         // 13 - 19. Number Types
         val isTollfree = natNumStr.startsWith("1800") || natNumStr.startsWith("800") || natNumStr.startsWith("888") || natNumStr.startsWith("877") || natNumStr.startsWith("866") || natNumStr.startsWith("855") || natNumStr.startsWith("844")
-        val isPremium = natNumStr.startsWith("1900") || natNumStr.startsWith("900") || natNumStr.startsWith("0900")
+        val isPremium = (natNumStr.startsWith("1900") || (countryCodeStr == "1" && natNumStr.startsWith("900")) || (countryCodeStr == "44" && natNumStr.startsWith("900")) || (countryCodeStr == "33" && natNumStr.startsWith("89")))
         val isVoip = natNumStr.startsWith("140") || natNumStr.startsWith("843")
-        val isMobile = (natLen == 10 && (natNumStr[0] in listOf('6', '7', '8', '9')) && countryCodeStr == "91") || (natLen == 10 && countryCodeStr == "1")
+        val isMobile = (natLen == 10 && (natNumStr[0] in listOf('6', '7', '8', '9')) && countryCodeStr == "91") || (natLen == 10 && countryCodeStr == "1" && !isTollfree && !isPremium) || (countryCodeStr == "44" && natNumStr.startsWith("7")) || (countryCodeStr == "81" && (natNumStr.startsWith("90") || natNumStr.startsWith("80") || natNumStr.startsWith("70")))
         val isFixed = !isMobile && !isTollfree && !isPremium
         val isUan = natNumStr.startsWith("140") || EMERGENCY_SHORTCODES.contains(onlyDigits)
 
@@ -186,7 +224,10 @@ object PhoneNumberFeatureExtractor {
         vec[23] = if (natLen <= 6 && cleaned.startsWith("+")) 1.0f else 0.0f
 
         // 24. Hard Negative Bank
-        val isBank = BANK_REGEXES.any { it.containsMatchIn(fullE164) || it.containsMatchIn(cleaned) }
+        var isBank = isTollfree
+        if (!isBank) {
+            isBank = BANK_REGEXES.any { it.containsMatchIn(fullE164) || it.containsMatchIn(cleaned) }
+        }
         vec[24] = if (isBank) 1.0f else 0.0f
 
         // 25. Hard Negative Emergency
@@ -195,19 +236,26 @@ object PhoneNumberFeatureExtractor {
         // 26. Same country
         val sameCountry = (defaultCountry == "IN" && countryCodeStr == "91") ||
                 (defaultCountry == "US" && countryCodeStr == "1") ||
-                (defaultCountry == "GB" && countryCodeStr == "44")
+                (defaultCountry == "GB" && countryCodeStr == "44") ||
+                (defaultCountry == "FR" && countryCodeStr == "33") ||
+                (defaultCountry == "DE" && countryCodeStr == "49") ||
+                (defaultCountry == "AU" && countryCodeStr == "61") ||
+                (defaultCountry == "JP" && countryCodeStr == "81") ||
+                (defaultCountry == "BR" && countryCodeStr == "55") ||
+                (defaultCountry == "ID" && countryCodeStr == "62") ||
+                (defaultCountry == "NG" && countryCodeStr == "234")
         vec[26] = if (sameCountry) 1.0f else 0.0f
 
         // 27. Country risk tier
         if (isWangiri) vec[27] = 1.0f
-        else if (countryCodeStr in listOf("91", "1", "44", "61", "49")) vec[27] = 0.10f
+        else if (countryCodeStr in listOf("91", "1", "44", "61", "49", "33", "81", "55", "62", "234")) vec[27] = 0.10f
         else vec[27] = 0.40f
 
         // 28. Joint: Wangiri Trap
         vec[28] = if (isWangiri && (vec[3] < 0.70f || vec[2] > 0.0f)) 1.0f else 0.0f
 
-        // 29. Joint: VoIP Robocall
-        vec[29] = if (isVoip && (vec[5] >= 0.30f || vec[8] >= 0.30f || vec[6] >= 0.30f)) 1.0f else 0.0f
+        // 29. Joint: Low-Entropy Robocall
+        vec[29] = if ((vec[5] >= 0.50f || vec[6] >= 0.60f || vec[7] >= 0.60f || vec[8] >= 0.50f) && vec[24] == 0.0f && vec[25] == 0.0f) 1.0f else 0.0f
 
         // 30. Joint: Spoofed Short Dialer
         vec[30] = if (vec[2] >= 0.20f && (isPremium || isUnallocated)) 1.0f else 0.0f
