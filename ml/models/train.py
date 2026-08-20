@@ -4,8 +4,6 @@ Trains:
 1. Production Gradient Boosted Trees Ensemble (150 Estimators, max depth 4)
 2. Calibrated Sigmoid Parameters (A, B) fit on dedicated validation split
 3. Multi-Class Random Forest Model (5 Classes: BENIGN, UNKNOWN, SPAM, SCAM, INVALID)
-
-Saves explicit calibration constants (A, B) into metadata for 100% Android runtime parity.
 """
 
 import os
@@ -13,10 +11,9 @@ import sys
 import json
 import numpy as np
 import joblib
-from scipy.optimize import minimize
 from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import roc_auc_score, average_precision_score, brier_score_loss, log_loss
+from sklearn.metrics import roc_auc_score, average_precision_score, brier_score_loss
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from ml.features.extractor import extract_features_from_number, FEATURE_SPEC
@@ -30,11 +27,9 @@ def train_production_models():
     print("      AEGIS-PNP2 PRODUCTION MODEL TRAINING & SIGMOID CALIBRATION PIPELINE")
     print("="*85)
 
-    # 1. Load Training Data
     with open(os.path.join(DATA_DIR, "train_dataset.json"), "r", encoding="utf-8-sig") as f:
         train_samples = json.load(f)
 
-    # 2. Load Validation Data (for calibration & parameter tuning)
     with open(os.path.join(DATA_DIR, "val_dataset.json"), "r", encoding="utf-8-sig") as f:
         val_samples = json.load(f)
 
@@ -61,7 +56,7 @@ def train_production_models():
     print(f"[*] Training Data:   X={X_train.shape}, Threats={np.sum(y_binary_train == 1)} ({np.mean(y_binary_train)*100:.1f}%)")
     print(f"[*] Validation Data: X={X_val.shape}, Threats={np.sum(y_binary_val == 1)} ({np.mean(y_binary_val)*100:.1f}%)")
 
-    # 3. Train Production Gradient Boosted Trees
+    # 1. Train Production Gradient Boosted Trees
     print("\n[1/3] Training Production Gradient Boosted Decision Tree Ensemble (150 Estimators)...")
     gbt = GradientBoostingClassifier(
         n_estimators=150,
@@ -74,18 +69,13 @@ def train_production_models():
     )
     gbt.fit(X_train, y_binary_train)
 
-    # 4. Compute Raw Logits on Validation Split & Fit Explicit Sigmoid Calibration (A, B)
-    print("[2/3] Fitting Explicit Sigmoid Calibration Parameters (A, B) on Validation Set...")
+    # 2. Regularized Sigmoid Calibration (A, B) on Validation Set
+    print("[2/3] Fitting Regularized Sigmoid Calibration Parameters (A, B) on Validation Set...")
     val_raw_logits = gbt.decision_function(X_val)
 
-    # Logistic calibration: P = 1 / (1 + exp(A * logit + B))
-    # We fit A and B via Logistic Regression on validation logits
-    cal_lr = LogisticRegression(C=10.0, solver="lbfgs", max_iter=1000)
-    # Feature is -logit so standard logistic regression P = 1 / (1 + exp(-(coef*(-logit) + intercept)))
+    cal_lr = LogisticRegression(C=1.0, solver="lbfgs", max_iter=1000)
     cal_lr.fit(val_raw_logits.reshape(-1, 1), y_binary_val)
 
-    # In standard form P(y=1) = 1 / (1 + exp(- (w * x + b)))
-    # With x = logit, P(y=1) = 1 / (1 + exp(A * logit + B)) where A = -w, B = -b
     param_A = float(-cal_lr.coef_[0][0])
     param_B = float(-cal_lr.intercept_[0])
 
@@ -99,12 +89,12 @@ def train_production_models():
     print(f"  * Validation ROC-AUC:            {val_roc:.4f}")
     print(f"  * Validation PR-AUC:             {val_prauc:.4f}")
 
-    # 5. Train Multi-Class Random Forest Model
+    # 3. Train Multi-Class Random Forest Model
     print("[3/3] Training Multiclass Random Forest Classifier (5 Classes)...")
     rf_multi = RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42, n_jobs=-1, class_weight="balanced")
     rf_multi.fit(X_train, y_multi_train)
 
-    # 6. Feature Importances
+    # 4. Feature Importances
     importances = gbt.feature_importances_
     indices = np.argsort(importances)[::-1]
     print("\nTop 12 Most Discriminative Phone Number Structural Features:")
@@ -114,7 +104,7 @@ def train_production_models():
         f_desc = FEATURE_SPEC["features"][idx]["description"]
         print(f"  {rank+1:>2}. [{idx:02d}] {f_name:<35}: {importances[idx]:.4f} ({f_desc})")
 
-    # 7. Save Model Binaries & Calibration Constants
+    # 5. Save Model Binaries & Calibration Constants
     print(f"\nSaving model binaries and calibration constants to {MODELS_DIR}...")
     joblib.dump(gbt, os.path.join(MODELS_DIR, "gbt_model.joblib"))
     joblib.dump(rf_multi, os.path.join(MODELS_DIR, "rf_multi_model.joblib"))
@@ -122,9 +112,10 @@ def train_production_models():
 
     calibration_metadata = {
         "model_name": "AEGIS-PNP2",
-        "version": "2.0.0",
+        "version": "2.1.0",
+        "objective": "PATTERN_RISK",
         "method": "sigmoid_platt_scaling",
-        "formula": "P(Threat | logit) = 1.0 / (1.0 + exp(A * logit + B))",
+        "formula": "P(Pattern Risk | logit) = 1.0 / (1.0 + exp(A * logit + B))",
         "param_A": param_A,
         "param_B": param_B,
         "val_brier_score": float(val_brier),

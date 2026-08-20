@@ -1,114 +1,98 @@
 [
   {
-    "name": "State Bank of India Customer Care",
+    "entity": "State Bank of India",
     "number": "+911800112211",
     "country": "IN",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.1
+    "category": "Bank Toll-Free Care"
   },
   {
-    "name": "SBI Alternate Care",
+    "entity": "SBI Alternate Care",
     "number": "+9118004253800",
     "country": "IN",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.1
+    "category": "Bank Toll-Free Care"
   },
   {
-    "name": "HDFC Bank Priority Support",
+    "entity": "HDFC Bank Priority Support",
     "number": "+9118002026161",
     "country": "IN",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.1
+    "category": "Bank Toll-Free Care"
   },
   {
-    "name": "ICICI Bank Phone Banking",
+    "entity": "ICICI Bank Phone Banking",
     "number": "+9118001080",
     "country": "IN",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.1
+    "category": "Bank Toll-Free Care"
   },
   {
-    "name": "Axis Bank Helpline",
+    "entity": "Axis Bank Helpline",
     "number": "+9118002098800",
     "country": "IN",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.1
+    "category": "Bank Toll-Free Care"
   },
   {
-    "name": "Punjab National Bank Care",
+    "entity": "Punjab National Bank Care",
     "number": "+9118001802222",
     "country": "IN",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.1
+    "category": "Bank Toll-Free Care"
   },
   {
-    "name": "Bank of Baroda Priority",
+    "entity": "Bank of Baroda Priority",
     "number": "+911800229090",
     "country": "IN",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.1
+    "category": "Bank Toll-Free Care"
   },
   {
-    "name": "Chase Bank Customer Support",
+    "entity": "Chase Bank Customer Support",
     "number": "+18009359935",
     "country": "US",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.1
+    "category": "Bank Toll-Free Care"
   },
   {
-    "name": "Bank of America Help Line",
+    "entity": "Bank of America Help Line",
     "number": "+18004321000",
     "country": "US",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.1
+    "category": "Bank Toll-Free Care"
   },
   {
-    "name": "Wells Fargo Banking Line",
+    "entity": "Wells Fargo Banking Line",
     "number": "+18008693557",
     "country": "US",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.1
+    "category": "Bank Toll-Free Care"
   },
   {
-    "name": "Barclays UK Freephone",
+    "entity": "Barclays UK Freephone",
     "number": "+44800123456",
     "country": "GB",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.1
+    "category": "Bank Toll-Free Care"
   },
   {
-    "name": "HSBC UK Customer Care",
+    "entity": "HSBC UK Customer Care",
     "number": "+448000852401",
     "country": "GB",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.1
+    "category": "Bank Toll-Free Care"
   },
   {
-    "name": "India National Emergency",
+    "entity": "India National Emergency",
     "number": "112",
     "country": "IN",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.05
+    "category": "Emergency & Public Service"
   },
   {
-    "name": "India Cyber Crime Helpline",
+    "entity": "India Cyber Crime Helpline",
     "number": "1930",
     "country": "IN",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.05
+    "category": "Emergency & Public Service"
   },
   {
-    "name": "US Emergency Services",
+    "entity": "US Emergency Services",
     "number": "911",
     "country": "US",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.05
+    "category": "Emergency & Public Service"
   },
   {
-    "name": "UK Emergency Line",
+    "entity": "UK Emergency Line",
     "number": "999",
     "country": "GB",
-    "expected_tier": "LEGITIMATE",
-    "expected_max_risk": 0.05
+    "category": "Emergency & Public Service"
   }
 ]

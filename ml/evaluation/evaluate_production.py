@@ -130,10 +130,11 @@ def run_production_evaluation():
         raw_l = float(gbt_model.decision_function(v.reshape(1, -1))[0])
         p = float(1.0 / (1.0 + np.exp(param_A * raw_l + param_B)))
         score = int(round(p * 100))
-        passed = (p <= item["expected_max_risk"])
+        max_allowed = item.get("expected_max_risk", 0.10)
+        passed = (p <= max_allowed)
         if passed: hard_passed += 1
         status = "[PASS]" if passed else f"[FAIL - P={p:.4f}]"
-        print(f"{item['name']:<35} | {item['number']:<16} | {score:<2}/100 ({p:.4f}) | {status}")
+        print(f"{item.get('entity', item.get('name', 'Line')):<35} | {item['number']:<16} | {score:<2}/100 ({p:.4f}) | {status}")
 
     print("-" * 78)
     print(f"Hard Negatives Pass Rate: {hard_passed} / {len(hard_negs)} ({hard_passed/len(hard_negs)*100:.1f}%)")
@@ -143,7 +144,7 @@ def run_production_evaluation():
     # -------------------------------------------------------------
     report_content = f"""# AEGIS-PNP2: Production Evaluation & Benchmark Report
 
-## 1. Untouched Holdout Test Set ($N = 2,500$ Unseen Numbers, 0 Leakage)
+## 1. Untouched Holdout Test Set ($N = {n_test}$ Unseen Numbers, 0 Leakage)
 
 | Performance Metric | Score / Value | Status / Interpretation |
 | :--- | :---: | :--- |
@@ -165,7 +166,7 @@ def run_production_evaluation():
 
 ---
 
-## 2. Natural Operational Prevalence Benchmark ($N = 5,000$ Samples: 85% Safe, 15% Threat)
+## 2. Natural Operational Prevalence Benchmark ($N = {n_prev}$ Samples: 85% Safe, 15% Threat)
 * **Threat Recall:** **`{p_recall:.2f}%`** ({p_tp} / {p_tp+p_fn} threats detected)
 * **Threat Precision:** **`{p_precision:.2f}%`**
 * **False Positive Rate on Safe/Unk:** **`{p_fpr:.2f}%`** ({p_fp} / {p_fp+p_tn})

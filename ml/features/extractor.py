@@ -1,7 +1,7 @@
 ﻿"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2)
 Deterministic Privacy-Preserving Feature Extractor (36 Features)
-Integrated with Google libphonenumber & Per-Instance Explainability
+Direct Integration with Google libphonenumber & Per-Instance Explainability
 """
 
 import os
@@ -11,6 +11,9 @@ import math
 import re
 import numpy as np
 from typing import Dict, Any, List, Tuple, Optional
+
+import phonenumbers
+from phonenumbers import PhoneNumberType, PhoneNumberFormat
 
 SPEC_PATH = os.path.join(os.path.dirname(__file__), "feature_spec.json")
 with open(SPEC_PATH, "r", encoding="utf-8-sig") as f:
@@ -111,10 +114,10 @@ def compute_palindrome_symmetry(digits: str) -> float:
     return matches / float(len(digits))
 
 def normalize_and_parse(raw_number: str, default_country: str = "IN") -> Tuple[str, str, str, int, bool]:
-    if not raw_number or not raw_number.strip():
+    if not raw_number or not str(raw_number).strip():
         return "", "", "", 10, False
 
-    raw_clean = raw_number.strip()
+    raw_clean = str(raw_number).strip()
     only_digits = re.sub(r"[^\d]", "", raw_clean)
     cleaned = re.sub(r"[^\d+]", "", raw_clean)
 
@@ -131,42 +134,31 @@ def normalize_and_parse(raw_number: str, default_country: str = "IN") -> Tuple[s
             nat = only_digits[len(wp):] if len(only_digits) > len(wp) else only_digits
             return f"+{wp}{nat}", wp, nat, 10, True
 
-    if cleaned.startswith("+91") or (default_country == "IN" and len(only_digits) >= 10):
-        cc = "91"
-        nat = only_digits[2:] if cleaned.startswith("+91") or (only_digits.startswith("91") and len(only_digits) >= 12) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
-        is_v = (10 <= len(nat) <= 11) and not (len(set(nat)) == 1 and nat[0] == "0")
-        return f"+91{nat}", cc, nat, 10, is_v
-    elif cleaned.startswith("+1") or (default_country == "US" and len(only_digits) == 10):
-        cc = "1"
-        nat = only_digits[1:] if cleaned.startswith("+1") or (only_digits.startswith("1") and len(only_digits) == 11) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
-        is_v = (len(nat) == 10)
-        return f"+1{nat}", cc, nat, 10, is_v
-    elif cleaned.startswith("+44") or default_country == "GB":
-        cc = "44"
-        nat = only_digits[2:] if cleaned.startswith("+44") or (only_digits.startswith("44") and len(only_digits) >= 11) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
-        is_v = (9 <= len(nat) <= 11)
-        return f"+44{nat}", cc, nat, 10, is_v
-    elif cleaned.startswith("+33") or default_country == "FR":
-        cc = "33"
-        nat = only_digits[2:] if cleaned.startswith("+33") or (only_digits.startswith("33") and len(only_digits) >= 10) else (only_digits[-9:] if len(only_digits) >= 9 else only_digits)
-        is_v = (len(nat) == 9)
-        return f"+33{nat}", cc, nat, 9, is_v
-    elif cleaned.startswith("+49") or default_country == "DE":
-        cc = "49"
-        nat = only_digits[2:] if cleaned.startswith("+49") or (only_digits.startswith("49") and len(only_digits) >= 11) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
-        return f"+49{nat}", cc, nat, 10, True
-    elif cleaned.startswith("+61") or default_country == "AU":
-        cc = "61"
-        nat = only_digits[2:] if cleaned.startswith("+61") or (only_digits.startswith("61") and len(only_digits) >= 10) else (only_digits[-9:] if len(only_digits) >= 9 else only_digits)
-        return f"+61{nat}", cc, nat, 9, True
-    elif cleaned.startswith("+81") or default_country == "JP":
-        cc = "81"
-        nat = only_digits[2:] if cleaned.startswith("+81") or (only_digits.startswith("81") and len(only_digits) >= 11) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
-        return f"+81{nat}", cc, nat, 10, True
-    else:
-        cc = only_digits[:3] if len(only_digits) >= 3 else only_digits
-        nat = only_digits[3:] if len(only_digits) > 3 else only_digits
-        return f"+{cc}{nat}", cc, nat, 10, (7 <= len(only_digits) <= 15)
+    try:
+        parsed = phonenumbers.parse(raw_clean, default_country)
+        is_v = phonenumbers.is_valid_number(parsed)
+        e164 = phonenumbers.format_number(parsed, PhoneNumberFormat.E164)
+        cc = str(parsed.country_code)
+        nat = str(parsed.national_number)
+        std_len = 10
+        if cc in ("33", "61"): std_len = 9
+        elif cc in ("55",): std_len = 11
+        return e164, cc, nat, std_len, is_v
+    except Exception:
+        # Fallback deterministic parser
+        if cleaned.startswith("+91") or (default_country == "IN" and len(only_digits) >= 10):
+            cc = "91"
+            nat = only_digits[2:] if cleaned.startswith("+91") or (only_digits.startswith("91") and len(only_digits) >= 12) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
+            is_v = (10 <= len(nat) <= 11)
+            return f"+91{nat}", cc, nat, 10, is_v
+        elif cleaned.startswith("+1") or (default_country == "US" and len(only_digits) == 10):
+            cc = "1"
+            nat = only_digits[1:] if cleaned.startswith("+1") or (only_digits.startswith("1") and len(only_digits) == 11) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
+            return f"+1{nat}", cc, nat, 10, (len(nat) == 10)
+        else:
+            cc = only_digits[:3] if len(only_digits) >= 3 else only_digits
+            nat = only_digits[3:] if len(only_digits) > 3 else only_digits
+            return f"+{cc}{nat}", cc, nat, 10, (7 <= len(only_digits) <= 15)
 
 def extract_features_from_number(raw_number: str, default_country: str = "IN") -> np.ndarray:
     vec = np.zeros(FEATURE_SPEC["num_features"], dtype=np.float32)
@@ -175,7 +167,7 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
     if not nat_num_str:
         return vec
 
-    only_digits = re.sub(r"[^\d]", "", raw_number.strip())
+    only_digits = re.sub(r"[^\d]", "", str(raw_number).strip())
     nat_len = len(nat_num_str)
     full_e164 = e164 if e164 else f"+{country_code_str}{nat_num_str}"
 
@@ -223,17 +215,24 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
     else:
         vec[12] = 0.0
 
-    # 13 - 19. Number Type Metadata
-    is_tollfree = nat_num_str.startswith("1800") or nat_num_str.startswith("800") or nat_num_str.startswith("888") or nat_num_str.startswith("877") or nat_num_str.startswith("866") or nat_num_str.startswith("855") or nat_num_str.startswith("844")
-    is_premium = (nat_num_str.startswith("1900") or (country_code_str == "1" and nat_num_str.startswith("900")) or (country_code_str == "44" and nat_num_str.startswith("900")) or (country_code_str == "33" and nat_num_str.startswith("89")))
-    is_voip = nat_num_str.startswith("140") or nat_num_str.startswith("843")
-    is_mobile = (nat_len == 10 and nat_num_str[0] in ("6", "7", "8", "9") and country_code_str == "91") or (nat_len == 10 and country_code_str == "1" and not is_tollfree and not is_premium) or (country_code_str == "44" and nat_num_str.startswith("7")) or (country_code_str == "81" and nat_num_str.startswith(("90", "80", "70")))
-    is_fixed = not is_mobile and not is_tollfree and not is_premium
-    is_uan = nat_num_str.startswith("140") or only_digits in EMERGENCY_SHORTCODES
+    # 13 - 19. Number Type Metadata via libphonenumber
+    ntype = PhoneNumberType.UNKNOWN
+    try:
+        parsed = phonenumbers.parse(raw_number, default_country)
+        ntype = phonenumbers.number_type(parsed)
+    except Exception:
+        pass
+
+    is_tollfree = (ntype == PhoneNumberType.TOLL_FREE) or nat_num_str.startswith("1800") or nat_num_str.startswith("800") or nat_num_str.startswith("888") or nat_num_str.startswith("877") or nat_num_str.startswith("866") or nat_num_str.startswith("855") or nat_num_str.startswith("844")
+    is_premium = (ntype == PhoneNumberType.PREMIUM_RATE) or (nat_num_str.startswith("1900") or (country_code_str == "1" and nat_num_str.startswith("900")) or (country_code_str == "44" and nat_num_str.startswith("900")) or (country_code_str == "33" and nat_num_str.startswith("89")))
+    is_voip = (ntype == PhoneNumberType.VOIP) or nat_num_str.startswith("140") or nat_num_str.startswith("843")
+    is_mobile = (ntype == PhoneNumberType.MOBILE) or ((nat_len == 10 and nat_num_str[0] in ("6", "7", "8", "9") and country_code_str == "91") or (nat_len == 10 and country_code_str == "1" and not is_tollfree and not is_premium) or (country_code_str == "44" and nat_num_str.startswith("7")) or (country_code_str == "81" and nat_num_str.startswith(("90", "80", "70"))))
+    is_fixed = (ntype == PhoneNumberType.FIXED_LINE) or (not is_mobile and not is_tollfree and not is_premium)
+    is_uan = (ntype == PhoneNumberType.UAN) or nat_num_str.startswith("140") or only_digits in EMERGENCY_SHORTCODES
 
     vec[13] = 1.0 if is_tollfree else 0.0
     vec[14] = 1.0 if is_premium else 0.0
-    vec[15] = 0.0
+    vec[15] = 1.0 if (ntype == PhoneNumberType.SHARED_COST) else 0.0
     vec[16] = 1.0 if is_voip else 0.0
     vec[17] = 1.0 if is_mobile else 0.0
     vec[18] = 1.0 if is_fixed else 0.0
@@ -244,7 +243,7 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
     vec[20] = 1.0 if is_wangiri else 0.0
 
     # 21. Telemarketing series
-    is_telemarketing = any(re.search(pat, full_e164) or re.search(pat, raw_number) for pat in TELEMARKETING_PREFIXES)
+    is_telemarketing = any(re.search(pat, full_e164) or re.search(pat, str(raw_number)) for pat in TELEMARKETING_PREFIXES)
     vec[21] = 1.0 if is_telemarketing else 0.0
 
     # 22. Unallocated exchange code
@@ -255,10 +254,10 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
     vec[22] = 1.0 if is_unallocated else 0.0
 
     # 23. Shortcode formatted as E.164
-    vec[23] = 1.0 if (nat_len <= 6 and raw_number.strip().startswith("+")) else 0.0
+    vec[23] = 1.0 if (nat_len <= 6 and str(raw_number).strip().startswith("+")) else 0.0
 
     # 24. Hard Negative: Legitimate bank support pattern
-    is_bank = is_tollfree or any(re.search(bp, full_e164) or re.search(bp, raw_number) for bp in LEGITIMATE_BANK_PATTERNS)
+    is_bank = is_tollfree or any(re.search(bp, full_e164) or re.search(bp, str(raw_number)) for bp in LEGITIMATE_BANK_PATTERNS)
     vec[24] = 1.0 if is_bank else 0.0
 
     # 25. Hard Negative: Emergency service
@@ -306,8 +305,8 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
         vec[33] = min(diff_sum / (9.0 * (nat_len - 1)), 1.0)
 
     # 34 & 35
-    vec[34] = 0.0
-    vec[35] = 0.0
+    vec[34] = 1.0 if (ntype == PhoneNumberType.PERSONAL_NUMBER) else 0.0
+    vec[35] = 1.0 if (ntype == PhoneNumberType.PAGER) else 0.0
 
     return vec
 

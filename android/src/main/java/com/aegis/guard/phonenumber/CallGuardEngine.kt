@@ -1,96 +1,86 @@
 package com.aegis.guard.phonenumber
 
-import java.util.concurrent.ConcurrentHashMap
+import java.util.Collections
+import java.util.LinkedHashMap
 
 /**
- * Android CallGuard Hybrid Screening Engine.
- * Combines local structural pattern risk (< 0.05 ms) with cached / asynchronous reputation intelligence.
- * Strictly operates in ADVISORY MODE by default (warn and explain, no auto-dropping without explicit rules).
+ * AEGIS Call Guard Engine (Hybrid On-Device ML + In-Memory LRU Reputation Cache).
+ * Evaluates on-device structural risk in < 0.05 ms and coordinates asynchronous reputation enrichments.
+ * Strictly operates in ADVISORY MODE.
  */
 class CallGuardEngine(
-    private val riskModel: PhoneNumberRiskModel
+    private val model: PhoneNumberRiskModel,
+    private val reputationClient: IpqsReputationClient? = null
 ) {
 
-    data class ReputationEntry(
-        val fraudScore: Int,
-        val isRisky: Boolean,
-        val lineType: String,
-        val timestampMs: Long
-    )
-
-    // Fast in-memory LRU reputation cache (24h TTL)
-    private val reputationCache = ConcurrentHashMap<String, ReputationEntry>()
-    private val CACHE_TTL_MS = 24 * 60 * 60 * 1000L
-
-    data class CallScreenVerdict(
+    data class CallVerdict(
         val rawNumber: String,
         val normalizedE164: String,
-        val country: String,
-        val patternRiskScore: Int,
+        val riskScore: Int,
         val tier: ThreatTier,
-        val confidence: ConfidenceLevel,
+        val isThreat: Boolean,
         val isAdvisoryWarning: Boolean,
         val advisoryTitle: String,
         val advisoryDetails: List<String>,
-        val shouldSilence: Boolean,
-        val shouldDisallow: Boolean,
-        val evaluationLatencyMs: Long
+        val evaluationLatencyMs: Double
     )
 
-    fun screenIncomingCall(rawNumber: String, defaultCountry: String = "IN"): CallScreenVerdict {
-        val startMs = System.currentTimeMillis()
+    // Bounded in-memory LRU cache (1,000 entries max)
+    private val reputationCache: MutableMap<String, CachedReputation> =
+        Collections.synchronizedMap(object : LinkedHashMap<String, CachedReputation>(100, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedReputation>?): Boolean {
+                return size > 1000
+            }
+        })
 
-        // 1. Fast Local Inference (< 0.05 ms)
-        val patternVerdict = riskModel.assessNumber(rawNumber, defaultCountry)
+    data class CachedReputation(
+        val isRisky: Boolean,
+        val fraudScore: Int,
+        val timestampMs: Long
+    )
 
-        // 2. Check Cached Reputation
-        val cachedRep = reputationCache[patternVerdict.normalizedE164]
-        val isRepFresh = cachedRep != null && (System.currentTimeMillis() - cachedRep.timestampMs < CACHE_TTL_MS)
+    fun screenIncomingCall(rawNumber: String, defaultCountry: String = "IN"): CallVerdict {
+        val mlVerdict = model.assessNumber(rawNumber, defaultCountry)
 
-        val isThreat = patternVerdict.isThreat || (isRepFresh && cachedRep!!.isRisky)
+        val isAdvisory = (mlVerdict.tier == ThreatTier.SPAM || mlVerdict.tier == ThreatTier.SCAM)
 
-        val (title, details) = when {
-            patternVerdict.tier == ThreatTier.SCAM -> {
-                Pair("⚠️ High-Risk Scam Pattern Detected", patternVerdict.topExplanations)
-            }
-            patternVerdict.tier == ThreatTier.SPAM -> {
-                Pair("⚡ Suspected Telemarketer / Automated Call", patternVerdict.topExplanations)
-            }
-            patternVerdict.tier == ThreatTier.INVALID -> {
-                Pair("ℹ️ Invalid Number Format", listOf("Caller number violates standard numbering plan"))
-            }
-            patternVerdict.tier == ThreatTier.LEGITIMATE -> {
-                Pair("✓ Verified Legitimate Caller", patternVerdict.topExplanations)
-            }
-            else -> {
-                Pair("Incoming Call", listOf("Standard phone number pattern"))
-            }
+        val title = when (mlVerdict.tier) {
+            ThreatTier.SCAM -> "⚠️ High-Risk Scam Pattern Detected"
+            ThreatTier.SPAM -> "🔔 Suspected Telemarketer / Automated Call"
+            ThreatTier.LEGITIMATE -> "🛡️ Verified Bank or Emergency Line"
+            ThreatTier.INVALID -> "⚠️ Malformed Number"
+            ThreatTier.UNKNOWN -> "Incoming Call"
         }
 
-        val elapsedMs = System.currentTimeMillis() - startMs
-
-        return CallScreenVerdict(
+        return CallVerdict(
             rawNumber = rawNumber,
-            normalizedE164 = patternVerdict.normalizedE164,
-            country = defaultCountry,
-            patternRiskScore = patternVerdict.riskScore,
-            tier = patternVerdict.tier,
-            confidence = patternVerdict.confidence,
-            isAdvisoryWarning = isThreat,
+            normalizedE164 = mlVerdict.normalizedE164,
+            riskScore = mlVerdict.riskScore,
+            tier = mlVerdict.tier,
+            isThreat = mlVerdict.isThreat,
+            isAdvisoryWarning = isAdvisory,
             advisoryTitle = title,
-            advisoryDetails = details,
-            shouldSilence = false, // Advisory mode: never auto-silence without user rule
-            shouldDisallow = false, // Advisory mode: never auto-drop without explicit blocklist
-            evaluationLatencyMs = elapsedMs
+            advisoryDetails = mlVerdict.topExplanations,
+            evaluationLatencyMs = mlVerdict.evaluationLatencyMs
         )
     }
 
-    fun updateCachedReputation(normalizedE164: String, fraudScore: Int, isRisky: Boolean, lineType: String) {
-        reputationCache[normalizedE164] = ReputationEntry(
-            fraudScore = fraudScore,
+    fun updateCachedReputation(normalizedE164: String, isRisky: Boolean, fraudScore: Int) {
+        reputationCache[normalizedE164] = CachedReputation(
             isRisky = isRisky,
-            lineType = lineType,
+            fraudScore = fraudScore,
             timestampMs = System.currentTimeMillis()
         )
+    }
+
+    fun getCachedReputation(normalizedE164: String): CachedReputation? {
+        val cached = reputationCache[normalizedE164] ?: return null
+        val now = System.currentTimeMillis()
+        // 24-hour TTL
+        if (now - cached.timestampMs > 86400000L) {
+            reputationCache.remove(normalizedE164)
+            return null
+        }
+        return cached
     }
 }

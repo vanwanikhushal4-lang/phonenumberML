@@ -2,12 +2,18 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.regex.*;
+import com.google.i18n.phonenumbers.PhoneNumberUtil;
+import com.google.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberFormat;
+import com.google.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberType;
+import com.google.i18n.phonenumbers.Phonenumber.PhoneNumber;
 
 /**
  * Pure Java 17 Complete End-to-End Evaluator for AEGIS-PNP2.
- * 100% Deterministic Parity with Python normalize_and_parse & extract_features_from_number.
+ * Uses official Google libphonenumber library.
  */
 public class JvmPhoneNumberEvaluator {
+
+    private static final PhoneNumberUtil phoneUtil = PhoneNumberUtil.getInstance();
 
     private static final Set<String> WANGIRI_PREFIXES = new HashSet<>(Arrays.asList(
         "881", "882", "883", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870", "871", "872", "873"
@@ -39,6 +45,7 @@ public class JvmPhoneNumberEvaluator {
         String nationalNumber = "";
         int stdLength = 10;
         boolean isValid = false;
+        PhoneNumberType type = PhoneNumberType.UNKNOWN;
     }
 
     public static ParseResult normalizeAndParse(String rawNumber, String defaultCountry) {
@@ -57,10 +64,11 @@ public class JvmPhoneNumberEvaluator {
             r.nationalNumber = onlyDigits;
             r.stdLength = onlyDigits.length();
             r.isValid = true;
+            r.type = PhoneNumberType.UAN;
             return r;
         }
 
-        // All-zeros or impossible length check
+        // All zeros or malformed check
         boolean allZeros = true;
         for (char c : onlyDigits.toCharArray()) {
             if (c != '0') { allZeros = false; break; }
@@ -74,72 +82,48 @@ public class JvmPhoneNumberEvaluator {
             return r;
         }
 
-        for (String wp : WANGIRI_PREFIXES) {
-            if (cleaned.startsWith("+" + wp) || onlyDigits.startsWith(wp)) {
-                r.countryCode = wp;
-                r.nationalNumber = onlyDigits.length() > wp.length() ? onlyDigits.substring(wp.length()) : onlyDigits;
-                r.e164 = "+" + wp + r.nationalNumber;
-                r.stdLength = 10;
-                r.isValid = true;
-                return r;
+        try {
+            PhoneNumber parsed = phoneUtil.parse(rawClean, defaultCountry);
+            r.isValid = phoneUtil.isValidNumber(parsed);
+            r.e164 = phoneUtil.format(parsed, PhoneNumberFormat.E164);
+            r.countryCode = String.valueOf(parsed.getCountryCode());
+            r.nationalNumber = String.valueOf(parsed.getNationalNumber());
+            r.type = phoneUtil.getNumberType(parsed);
+            r.stdLength = 10;
+            if (r.countryCode.equals("33") || r.countryCode.equals("61")) r.stdLength = 9;
+            else if (r.countryCode.equals("55")) r.stdLength = 11;
+            return r;
+        } catch (Exception e) {
+            for (String wp : WANGIRI_PREFIXES) {
+                if (cleaned.startsWith("+" + wp) || onlyDigits.startsWith(wp)) {
+                    r.countryCode = wp;
+                    r.nationalNumber = onlyDigits.length() > wp.length() ? onlyDigits.substring(wp.length()) : onlyDigits;
+                    r.e164 = "+" + wp + r.nationalNumber;
+                    r.stdLength = 10;
+                    r.isValid = true;
+                    return r;
+                }
             }
-        }
 
-        if (cleaned.startsWith("+91") || (defaultCountry.equals("IN") && onlyDigits.length() >= 10)) {
-            r.countryCode = "91";
-            r.nationalNumber = cleaned.startsWith("+91") || (onlyDigits.startsWith("91") && onlyDigits.length() >= 12) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
-            r.e164 = "+91" + r.nationalNumber;
-            r.stdLength = 10;
-            r.isValid = (r.nationalNumber.length() >= 10 && r.nationalNumber.length() <= 11);
-            return r;
-        } else if (cleaned.startsWith("+1") || (defaultCountry.equals("US") && onlyDigits.length() == 10)) {
-            r.countryCode = "1";
-            r.nationalNumber = cleaned.startsWith("+1") || (onlyDigits.startsWith("1") && onlyDigits.length() == 11) ? onlyDigits.substring(1) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
-            r.e164 = "+1" + r.nationalNumber;
-            r.stdLength = 10;
-            r.isValid = (r.nationalNumber.length() == 10);
-            return r;
-        } else if (cleaned.startsWith("+44") || defaultCountry.equals("GB")) {
-            r.countryCode = "44";
-            r.nationalNumber = cleaned.startsWith("+44") || (onlyDigits.startsWith("44") && onlyDigits.length() >= 11) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
-            r.e164 = "+44" + r.nationalNumber;
-            r.stdLength = 10;
-            r.isValid = (r.nationalNumber.length() >= 9 && r.nationalNumber.length() <= 11);
-            return r;
-        } else if (cleaned.startsWith("+33") || defaultCountry.equals("FR")) {
-            r.countryCode = "33";
-            r.nationalNumber = cleaned.startsWith("+33") || (onlyDigits.startsWith("33") && onlyDigits.length() >= 10) ? onlyDigits.substring(2) : (onlyDigits.length() >= 9 ? onlyDigits.substring(onlyDigits.length() - 9) : onlyDigits);
-            r.e164 = "+33" + r.nationalNumber;
-            r.stdLength = 9;
-            r.isValid = (r.nationalNumber.length() == 9);
-            return r;
-        } else if (cleaned.startsWith("+49") || defaultCountry.equals("DE")) {
-            r.countryCode = "49";
-            r.nationalNumber = cleaned.startsWith("+49") || (onlyDigits.startsWith("49") && onlyDigits.length() >= 11) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
-            r.e164 = "+49" + r.nationalNumber;
-            r.stdLength = 10;
-            r.isValid = true;
-            return r;
-        } else if (cleaned.startsWith("+61") || defaultCountry.equals("AU")) {
-            r.countryCode = "61";
-            r.nationalNumber = cleaned.startsWith("+61") || (onlyDigits.startsWith("61") && onlyDigits.length() >= 10) ? onlyDigits.substring(2) : (onlyDigits.length() >= 9 ? onlyDigits.substring(onlyDigits.length() - 9) : onlyDigits);
-            r.e164 = "+61" + r.nationalNumber;
-            r.stdLength = 9;
-            r.isValid = true;
-            return r;
-        } else if (cleaned.startsWith("+81") || defaultCountry.equals("JP")) {
-            r.countryCode = "81";
-            r.nationalNumber = cleaned.startsWith("+81") || (onlyDigits.startsWith("81") && onlyDigits.length() >= 11) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
-            r.e164 = "+81" + r.nationalNumber;
-            r.stdLength = 10;
-            r.isValid = true;
-            return r;
-        } else {
-            r.countryCode = onlyDigits.length() >= 3 ? onlyDigits.substring(0, 3) : onlyDigits;
-            r.nationalNumber = onlyDigits.length() > 3 ? onlyDigits.substring(3) : onlyDigits;
-            r.e164 = "+" + r.countryCode + r.nationalNumber;
-            r.stdLength = 10;
-            r.isValid = (onlyDigits.length() >= 7 && onlyDigits.length() <= 15);
+            if (cleaned.startsWith("+91") || (defaultCountry.equals("IN") && onlyDigits.length() >= 10)) {
+                r.countryCode = "91";
+                r.nationalNumber = cleaned.startsWith("+91") || (onlyDigits.startsWith("91") && onlyDigits.length() >= 12) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                r.e164 = "+91" + r.nationalNumber;
+                r.stdLength = 10;
+                r.isValid = (r.nationalNumber.length() >= 10 && r.nationalNumber.length() <= 11);
+            } else if (cleaned.startsWith("+1") || (defaultCountry.equals("US") && onlyDigits.length() == 10)) {
+                r.countryCode = "1";
+                r.nationalNumber = cleaned.startsWith("+1") || (onlyDigits.startsWith("1") && onlyDigits.length() == 11) ? onlyDigits.substring(1) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                r.e164 = "+1" + r.nationalNumber;
+                r.stdLength = 10;
+                r.isValid = (r.nationalNumber.length() == 10);
+            } else {
+                r.countryCode = onlyDigits.length() >= 3 ? onlyDigits.substring(0, 3) : onlyDigits;
+                r.nationalNumber = onlyDigits.length() > 3 ? onlyDigits.substring(3) : onlyDigits;
+                r.e164 = "+" + r.countryCode + r.nationalNumber;
+                r.stdLength = 10;
+                r.isValid = (onlyDigits.length() >= 7 && onlyDigits.length() <= 15);
+            }
             return r;
         }
     }
@@ -206,19 +190,19 @@ public class JvmPhoneNumberEvaluator {
         }
 
         // 13 - 19. Number Types
-        boolean isTollfree = p.nationalNumber.startsWith("1800") || p.nationalNumber.startsWith("800") || p.nationalNumber.startsWith("888") || p.nationalNumber.startsWith("877") || p.nationalNumber.startsWith("866") || p.nationalNumber.startsWith("855") || p.nationalNumber.startsWith("844");
-        boolean isPremium = (p.nationalNumber.startsWith("1900") || (p.countryCode.equals("1") && p.nationalNumber.startsWith("900")) || (p.countryCode.equals("44") && p.nationalNumber.startsWith("900")) || (p.countryCode.equals("33") && p.nationalNumber.startsWith("89")));
-        boolean isVoip = p.nationalNumber.startsWith("140") || p.nationalNumber.startsWith("843");
-        boolean isMobile = (natLen == 10 && (p.nationalNumber.charAt(0) == '6' || p.nationalNumber.charAt(0) == '7' || p.nationalNumber.charAt(0) == '8' || p.nationalNumber.charAt(0) == '9') && p.countryCode.equals("91")) ||
+        boolean isTollfree = (p.type == PhoneNumberType.TOLL_FREE) || p.nationalNumber.startsWith("1800") || p.nationalNumber.startsWith("800") || p.nationalNumber.startsWith("888") || p.nationalNumber.startsWith("877") || p.nationalNumber.startsWith("866") || p.nationalNumber.startsWith("855") || p.nationalNumber.startsWith("844");
+        boolean isPremium = (p.type == PhoneNumberType.PREMIUM_RATE) || (p.nationalNumber.startsWith("1900") || (p.countryCode.equals("1") && p.nationalNumber.startsWith("900")) || (p.countryCode.equals("44") && p.nationalNumber.startsWith("900")) || (p.countryCode.equals("33") && p.nationalNumber.startsWith("89")));
+        boolean isVoip = (p.type == PhoneNumberType.VOIP) || p.nationalNumber.startsWith("140") || p.nationalNumber.startsWith("843");
+        boolean isMobile = (p.type == PhoneNumberType.MOBILE) || ((natLen == 10 && (p.nationalNumber.charAt(0) == '6' || p.nationalNumber.charAt(0) == '7' || p.nationalNumber.charAt(0) == '8' || p.nationalNumber.charAt(0) == '9') && p.countryCode.equals("91")) ||
                            (natLen == 10 && p.countryCode.equals("1") && !isTollfree && !isPremium) ||
                            (p.countryCode.equals("44") && p.nationalNumber.startsWith("7")) ||
-                           (p.countryCode.equals("81") && (p.nationalNumber.startsWith("90") || p.nationalNumber.startsWith("80") || p.nationalNumber.startsWith("70")));
-        boolean isFixed = !isMobile && !isTollfree && !isPremium;
-        boolean isUan = p.nationalNumber.startsWith("140") || EMERGENCY_SHORTCODES.contains(onlyDigits);
+                           (p.countryCode.equals("81") && (p.nationalNumber.startsWith("90") || p.nationalNumber.startsWith("80") || p.nationalNumber.startsWith("70"))));
+        boolean isFixed = (p.type == PhoneNumberType.FIXED_LINE) || (!isMobile && !isTollfree && !isPremium);
+        boolean isUan = (p.type == PhoneNumberType.UAN) || p.nationalNumber.startsWith("140") || EMERGENCY_SHORTCODES.contains(onlyDigits);
 
         vec[13] = isTollfree ? 1.0f : 0.0f;
         vec[14] = isPremium ? 1.0f : 0.0f;
-        vec[15] = 0.0f;
+        vec[15] = (p.type == PhoneNumberType.SHARED_COST) ? 1.0f : 0.0f;
         vec[16] = isVoip ? 1.0f : 0.0f;
         vec[17] = isMobile ? 1.0f : 0.0f;
         vec[18] = isFixed ? 1.0f : 0.0f;
@@ -315,6 +299,10 @@ public class JvmPhoneNumberEvaluator {
             vec[33] = Math.min((float) diffSum / (9.0f * (float) (natLen - 1)), 1.0f);
         }
 
+        // 34. Personal Number & 35. Pager
+        vec[34] = (p.type == PhoneNumberType.PERSONAL_NUMBER) ? 1.0f : 0.0f;
+        vec[35] = (p.type == PhoneNumberType.PAGER) ? 1.0f : 0.0f;
+
         return vec;
     }
 
@@ -409,6 +397,7 @@ public class JvmPhoneNumberEvaluator {
         sb.append("{");
         sb.append("\"normalizedE164\":\"").append(p.e164).append("\",");
         sb.append("\"isValid\":").append(p.isValid).append(",");
+        sb.append("\"numberType\":\"").append(p.type.name()).append("\",");
         sb.append("\"features\":[");
         for (int i = 0; i < features.length; i++) {
             sb.append(String.format(Locale.US, "%.4f", features[i]));

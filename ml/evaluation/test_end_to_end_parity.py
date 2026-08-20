@@ -1,7 +1,7 @@
-"""
+﻿"""
 AEGIS Train / Serve Complete End-to-End Parity Verification Suite
 Verifies full pipeline parity between Python and Java/Kotlin on:
-- E.164 normalization
+- E.164 normalization (via Google libphonenumber)
 - 36 feature values (max error < 1e-4)
 - Raw tree logits
 - Calibrated probabilities
@@ -22,17 +22,18 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 from ml.features.extractor import extract_features_from_number, normalize_and_parse, explain_instance, FEATURE_SPEC
 
 EVAL_DIR = os.path.dirname(__file__)
+LIB_JAR = os.path.join(EVAL_DIR, "lib", "libphonenumber-8.13.52.jar")
 EXPORT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../export"))
 MODELS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/saved_models"))
 
 def compile_java():
-    print("Compiling JvmPhoneNumberEvaluator.java...")
-    cmd = ["javac", "-d", EVAL_DIR, os.path.join(EVAL_DIR, "JvmPhoneNumberEvaluator.java")]
+    print("Compiling JvmPhoneNumberEvaluator.java with libphonenumber-8.13.52.jar...")
+    cmd = ["javac", "-cp", f"{LIB_JAR};.", "-d", EVAL_DIR, os.path.join(EVAL_DIR, "JvmPhoneNumberEvaluator.java")]
     subprocess.run(cmd, check=True)
     print("Compilation successful.")
 
 def run_jvm_eval(raw_num: str, country: str) -> Dict[str, Any]:
-    cmd = ["java", "-cp", EVAL_DIR, "JvmPhoneNumberEvaluator", raw_num, country]
+    cmd = ["java", "-cp", f"{LIB_JAR};{EVAL_DIR}", "JvmPhoneNumberEvaluator", raw_num, country]
     res = subprocess.run(cmd, capture_output=True, text=True, check=True)
     return json.loads(res.stdout.strip())
 
@@ -78,7 +79,7 @@ def verify_end_to_end_parity():
         is_v_jvm = jvm_res["isValid"]
         v_jvm = np.array(jvm_res["features"], dtype=np.float32)
 
-        feat_diff = np.max(np.abs(v_py - v_jvm))
+        feat_diff = float(np.max(np.abs(v_py - v_jvm)))
         norm_match = (e164_py == e164_jvm) and (is_v_py == is_v_jvm)
         feat_match = (feat_diff < 1e-3)
 

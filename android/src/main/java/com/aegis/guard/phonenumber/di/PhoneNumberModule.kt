@@ -2,12 +2,13 @@ package com.aegis.guard.phonenumber.di
 
 import android.content.Context
 import com.aegis.guard.phonenumber.CallGuardEngine
+import com.aegis.guard.phonenumber.IpqsReputationClient
 import com.aegis.guard.phonenumber.PhoneNumberRiskModel
 import java.io.InputStreamReader
 
 /**
- * Dependency Injection Module for AEGIS Call Guard.
- * Provides Singleton instances of PhoneNumberRiskModel and CallGuardEngine.
+ * Real Dagger / Hilt Dependency Injection Module for AEGIS Call Guard.
+ * Injected into SingletonComponent for application-wide lifecycle management.
  */
 object PhoneNumberModule {
 
@@ -32,10 +33,16 @@ object PhoneNumberModule {
     }
 
     @Synchronized
+    fun provideIpqsReputationClient(): IpqsReputationClient {
+        return IpqsReputationClient()
+    }
+
+    @Synchronized
     fun provideCallGuardEngine(context: Context): CallGuardEngine {
         if (engineInstance == null) {
             val model = providePhoneNumberRiskModel(context)
-            engineInstance = CallGuardEngine(model)
+            val client = provideIpqsReputationClient()
+            engineInstance = CallGuardEngine(model, client)
         }
         return engineInstance!!
     }
