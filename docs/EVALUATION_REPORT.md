@@ -1,56 +1,42 @@
-# AEGIS-PNP1 Evaluation & Benchmark Report
+﻿# AEGIS-PNP2: Production Evaluation & Benchmark Report
 
-## 1. Executive Summary
-The AEGIS Phone Number Pattern Risk Model (AEGIS-PNP1) was evaluated on **2,500 unseen prefix and geographic holdout samples** to test generalizability across unseen numbering plans, foreign carriers, and emerging robocall series without memorization.
+## 1. Untouched Holdout Test Set ($N = 2,500$ Unseen Numbers, 0 Leakage)
 
----
+| Performance Metric | Score / Value | Status |
+| :--- | :---: | :--- |
+| **Total Test Samples** | **`2,500`** | Untouched Holdout Split |
+| **Threat Recall (Sensitivity)** | **`97.42%`** | $1,095 / 1,124$ threats caught |
+| **Threat Precision** | **`95.88%`** | **$\ge 95.0\%$ Release Gate Met** |
+| **False Positive Rate on Safe/Unk** | **`3.42%`** | $47 / 1,376$ false alarms |
+| **Overall Accuracy** | **`96.96%`** | $2,424 / 2,500$ correct |
+| **PR-AUC (Precision-Recall AUC)** | **`0.9975`** | Excellent discrimination |
+| **ROC-AUC** | **`0.9979`** | Area under ROC |
+| **Probability Calibration (Brier)** | **`0.018361`** | Well below $< 0.05$ threshold |
 
-## 2. Core Holdout Evaluation Metrics
-* **Total Holdout Samples:** 2,500
-* **Threat Recall (Sensitivity):** **`100.00%`** ($1,250 / 1,250$ spam/scam caught)
-* **Threat Precision:** **`99.84%`**
-* **False Positive Rate on Legitimate/Unknown:** **`0.16%`** ($2 / 1,250$ false alarms)
-* **Brier Score (Calibration):** **`0.0008`** (Ideal $< 0.05$)
-* **PR-AUC:** **`1.0000`**
-* **ROC-AUC:** **`1.0000`**
-
----
-
-## 3. Confusion Matrix (Threshold = 0.40)
+### Confusion Matrix (Operating Threshold = `0.40`):
 ```
-                     Predicted Safe / Unknown     Predicted Threat (Spam / Scam)
-Actual Safe/Unknown:          1,248                              2 (FPR: 0.16%)
-Actual Threat:                    0                          1,250 (Recall: 100.0%)
+                                Predicted SAFE / UNKNOWN     Predicted THREAT (Spam / Scam)
+  Actual SAFE / LEGITIMATE:             1,329 (96.58%)                  47 (FPR: 3.42%)
+  Actual THREAT (Spam / Scam):             29 (Miss: 2.58%)          1,095 (Recall: 97.42%)
 ```
 
 ---
 
-## 4. Slice-Based Performance by Country
-| Country Code | Sample Count | Threat Recall (%) | False Positive Rate (%) | PR-AUC |
-| :--- | :---: | :---: | :---: | :---: |
-| **Australia (AU)** | 174 | 100.0% | 0.0% | 1.0000 |
-| **Brazil (BR)** | 178 | 100.0% | 0.0% | 1.0000 |
-| **Canada (CA)** | 157 | 100.0% | 0.0% | 1.0000 |
-| **Germany (DE)** | 183 | 100.0% | 0.0% | 1.0000 |
-| **France (FR)** | 174 | 100.0% | 0.0% | 1.0000 |
-| **United Kingdom (GB)** | 335 | 100.0% | 0.0% | 1.0000 |
-| **Indonesia (ID)** | 163 | 100.0% | 0.0% | 1.0000 |
-| **India (IN)** | 598 | 100.0% | 0.6% | 1.0000 |
-| **Nigeria (NG)** | 168 | 100.0% | 0.0% | 1.0000 |
-| **United States (US)** | 370 | 100.0% | 0.0% | 1.0000 |
+## 2. Natural Operational Prevalence Benchmark ($N = 5,000$ Samples: 85% Safe, 15% Threat)
+* **Threat Recall:** **`96.80%`** ($695 / 718$ threats caught)
+* **Threat Precision:** **`82.64%`**
+* **False Positive Rate on Safe/Unk:** **`3.41%`** ($146 / 4,282$)
+* **Overall Accuracy:** **`96.62%`**
 
 ---
 
-## 5. Curated Hard-Negatives Verification
-| Organization / Line | Number | Expected Tier | Calibrated Risk | Status |
-| :--- | :--- | :---: | :---: | :---: |
-| State Bank of India Customer Care | `+911800112211` | `LEGITIMATE` | **`0 / 100 (0.001)`** | **PASS** |
-| SBI Alternate Customer Care | `+9118004253800` | `LEGITIMATE` | **`0 / 100 (0.001)`** | **PASS** |
-| HDFC Bank Priority Support | `+9118002026161` | `LEGITIMATE` | **`0 / 100 (0.001)`** | **PASS** |
-| ICICI Bank Phone Banking | `+9118001080` | `LEGITIMATE` | **`0 / 100 (0.001)`** | **PASS** |
-| Chase Bank Customer Support | `+18009359935` | `LEGITIMATE` | **`0 / 100 (0.001)`** | **PASS** |
-| Bank of America Help Line | `+18004321000` | `LEGITIMATE` | **`0 / 100 (0.002)`** | **PASS** |
-| Wells Fargo Banking Line | `+18008693557` | `LEGITIMATE` | **`0 / 100 (0.002)`** | **PASS** |
-| India National Emergency | `112` | `LEGITIMATE` | **`0 / 100 (0.001)`** | **PASS** |
-| US Emergency Services | `911` | `LEGITIMATE` | **`0 / 100 (0.001)`** | **PASS** |
-| UK Emergency Line | `999` | `LEGITIMATE` | **`0 / 100 (0.001)`** | **PASS** |
+## 3. Certified Bank Customer Care & Emergency Lines ($N = 16$)
+* **Hard Negatives Pass Rate:** **`16 / 16 (100.0%)`**
+* SBI (`+911800112211`), HDFC (`+9118002026161`), ICICI (`+9118001080`), Axis (`+9118002098800`), Chase (`+18009359935`), Barclays (`+44800123456`), Emergency `112`, `911`, `999`, Cyber Helpline `1930` all scored risk $< 1/100$ and tier `LEGITIMATE`.
+
+---
+
+## 4. End-to-End Parity Verification ($N = 20$ Canonical Cases)
+* **Python vs JVM / Kotlin Parity:** **`20 / 20 PASSED (100.0%)`**
+* **Max Feature Difference:** $< 0.000048$
+* Full agreement on normalization, validity, 36 features, logits, calibrated probabilities, tiers, and reason codes.

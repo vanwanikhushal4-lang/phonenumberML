@@ -8,7 +8,7 @@ import kotlin.math.min
 
 /**
  * Pure Kotlin / Android on-device feature extractor (36 dimensions).
- * 100% Deterministic Parity with Python AEGIS-PNP1 Feature Extractor.
+ * 100% End-to-End Deterministic Parity with Python AEGIS-PNP2 Feature Extractor.
  */
 object PhoneNumberFeatureExtractor {
 
@@ -38,108 +38,99 @@ object PhoneNumberFeatureExtractor {
         Regex("^\\+?33800\\d{6,8}$")
     )
 
-    fun extractFeatures(rawNumber: String?, defaultCountry: String = "IN"): FloatArray {
-        val vec = FloatArray(36)
-        if (rawNumber.isNullOrBlank()) return vec
+    data class NormalizedParse(
+        val e164: String,
+        val countryCode: String,
+        val nationalNumber: String,
+        val stdLength: Int,
+        val isValid: Boolean
+    )
 
-        val cleaned = rawNumber.trim().replace(Regex("[^\\d+]"), "")
-        val onlyDigits = rawNumber.trim().replace(Regex("[^\\d]"), "")
-        if (onlyDigits.isEmpty()) return vec
+    fun getNormalizedE164(rawNumber: String?, defaultCountry: String = "IN"): String {
+        return normalizeAndParse(rawNumber, defaultCountry).e164
+    }
 
-        var countryCodeStr = ""
-        var natNumStr = onlyDigits
-        var stdLength = 10
-        var isValid = false
+    fun normalizeAndParse(rawNumber: String?, defaultCountry: String = "IN"): NormalizedParse {
+        if (rawNumber.isNullOrBlank()) {
+            return NormalizedParse("", "", "", 10, false)
+        }
+
+        val rawClean = rawNumber.trim()
+        val onlyDigits = rawClean.replace(Regex("[^\\d]"), "")
+        val cleaned = rawClean.replace(Regex("[^\\d+]"), "")
 
         if (EMERGENCY_SHORTCODES.contains(onlyDigits)) {
-            countryCodeStr = defaultCountry
-            natNumStr = onlyDigits
-            stdLength = onlyDigits.length
-            isValid = true
-        } else {
-            var isWangiriPrefix = false
-            for (wp in WANGIRI_PREFIXES) {
-                if (cleaned.startsWith("+$wp") || onlyDigits.startsWith(wp)) {
-                    countryCodeStr = wp
-                    natNumStr = if (onlyDigits.length > wp.length) onlyDigits.substring(wp.length) else onlyDigits
-                    stdLength = 10
-                    isValid = true
-                    isWangiriPrefix = true
-                    break
-                }
-            }
+            return NormalizedParse(onlyDigits, defaultCountry, onlyDigits, onlyDigits.length, true)
+        }
 
-            if (!isWangiriPrefix) {
-                if (cleaned.startsWith("+91") || (defaultCountry == "IN" && onlyDigits.length >= 10)) {
-                    countryCodeStr = "91"
-                    natNumStr = if (cleaned.startsWith("+91") || (onlyDigits.startsWith("91") && onlyDigits.length == 12)) onlyDigits.substring(2) else (if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits)
-                    stdLength = 10
-                    isValid = true
-                } else if (cleaned.startsWith("+1") || (defaultCountry == "US" && onlyDigits.length == 10)) {
-                    countryCodeStr = "1"
-                    natNumStr = if (cleaned.startsWith("+1") || (onlyDigits.startsWith("1") && onlyDigits.length == 11)) onlyDigits.substring(1) else (if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits)
-                    stdLength = 10
-                    isValid = true
-                } else if (cleaned.startsWith("+44") || defaultCountry == "GB") {
-                    countryCodeStr = "44"
-                    natNumStr = if (cleaned.startsWith("+44") || (onlyDigits.startsWith("44") && onlyDigits.length == 12)) onlyDigits.substring(2) else (if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits)
-                    stdLength = 10
-                    isValid = true
-                } else if (cleaned.startsWith("+33") || defaultCountry == "FR") {
-                    countryCodeStr = "33"
-                    natNumStr = if (cleaned.startsWith("+33") || (onlyDigits.startsWith("33") && onlyDigits.length >= 10)) onlyDigits.substring(2) else (if (onlyDigits.length >= 9) onlyDigits.substring(onlyDigits.length - 9) else onlyDigits)
-                    stdLength = 9
-                    isValid = true
-                } else if (cleaned.startsWith("+49") || defaultCountry == "DE") {
-                    countryCodeStr = "49"
-                    natNumStr = if (cleaned.startsWith("+49") || (onlyDigits.startsWith("49") && onlyDigits.length >= 11)) onlyDigits.substring(2) else (if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits)
-                    stdLength = 10
-                    isValid = true
-                } else if (cleaned.startsWith("+61") || defaultCountry == "AU") {
-                    countryCodeStr = "61"
-                    natNumStr = if (cleaned.startsWith("+61") || (onlyDigits.startsWith("61") && onlyDigits.length >= 10)) onlyDigits.substring(2) else (if (onlyDigits.length >= 9) onlyDigits.substring(onlyDigits.length - 9) else onlyDigits)
-                    stdLength = 9
-                    isValid = true
-                } else if (cleaned.startsWith("+81") || defaultCountry == "JP") {
-                    countryCodeStr = "81"
-                    natNumStr = if (cleaned.startsWith("+81") || (onlyDigits.startsWith("81") && onlyDigits.length >= 11)) onlyDigits.substring(2) else (if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits)
-                    stdLength = 10
-                    isValid = true
-                } else if (cleaned.startsWith("+55") || defaultCountry == "BR") {
-                    countryCodeStr = "55"
-                    natNumStr = if (cleaned.startsWith("+55") || (onlyDigits.startsWith("55") && onlyDigits.length >= 12)) onlyDigits.substring(2) else (if (onlyDigits.length >= 11) onlyDigits.substring(onlyDigits.length - 11) else onlyDigits)
-                    stdLength = 11
-                    isValid = true
-                } else if (cleaned.startsWith("+62") || defaultCountry == "ID") {
-                    countryCodeStr = "62"
-                    natNumStr = if (cleaned.startsWith("+62") || (onlyDigits.startsWith("62") && onlyDigits.length >= 11)) onlyDigits.substring(2) else (if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits)
-                    stdLength = 10
-                    isValid = true
-                } else if (cleaned.startsWith("+234") || defaultCountry == "NG") {
-                    countryCodeStr = "234"
-                    natNumStr = if (cleaned.startsWith("+234") || (onlyDigits.startsWith("234") && onlyDigits.length >= 13)) onlyDigits.substring(3) else (if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits)
-                    stdLength = 10
-                    isValid = true
-                } else {
-                    countryCodeStr = if (onlyDigits.length >= 3) onlyDigits.substring(0, 3) else onlyDigits
-                    natNumStr = if (onlyDigits.length > 3) onlyDigits.substring(3) else onlyDigits
-                    stdLength = 10
-                    isValid = (onlyDigits.length in 7..15)
-                }
+        val allZeros = onlyDigits.isNotEmpty() && onlyDigits.all { it == '0' }
+        if (allZeros || onlyDigits.length < 3 || onlyDigits.length > 15) {
+            val cc = if (defaultCountry == "IN") "91" else if (defaultCountry == "US") "1" else "44"
+            return NormalizedParse(rawClean, cc, onlyDigits, 10, false)
+        }
+
+        for (wp in WANGIRI_PREFIXES) {
+            if (cleaned.startsWith("+$wp") || onlyDigits.startsWith(wp)) {
+                val nat = if (onlyDigits.length > wp.length) onlyDigits.substring(wp.length) else onlyDigits
+                return NormalizedParse("+$wp$nat", wp, nat, 10, true)
             }
         }
 
-        val natLen = natNumStr.length
-        val fullE164 = "+$countryCodeStr$natNumStr"
+        if (cleaned.startsWith("+91") || (defaultCountry == "IN" && onlyDigits.length >= 10)) {
+            val cc = "91"
+            val nat = if (cleaned.startsWith("+91") || (onlyDigits.startsWith("91") && onlyDigits.length >= 12)) onlyDigits.substring(2) else if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits
+            val isV = nat.length in 10..11 && !nat.all { it == '0' }
+            return NormalizedParse("+91$nat", cc, nat, 10, isV)
+        } else if (cleaned.startsWith("+1") || (defaultCountry == "US" && onlyDigits.length == 10)) {
+            val cc = "1"
+            val nat = if (cleaned.startsWith("+1") || (onlyDigits.startsWith("1") && onlyDigits.length == 11)) onlyDigits.substring(1) else if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits
+            return NormalizedParse("+1$nat", cc, nat, 10, nat.length == 10)
+        } else if (cleaned.startsWith("+44") || defaultCountry == "GB") {
+            val cc = "44"
+            val nat = if (cleaned.startsWith("+44") || (onlyDigits.startsWith("44") && onlyDigits.length >= 11)) onlyDigits.substring(2) else if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits
+            return NormalizedParse("+44$nat", cc, nat, 10, nat.length in 9..11)
+        } else if (cleaned.startsWith("+33") || defaultCountry == "FR") {
+            val cc = "33"
+            val nat = if (cleaned.startsWith("+33") || (onlyDigits.startsWith("33") && onlyDigits.length >= 10)) onlyDigits.substring(2) else if (onlyDigits.length >= 9) onlyDigits.substring(onlyDigits.length - 9) else onlyDigits
+            return NormalizedParse("+33$nat", cc, nat, 9, nat.length == 9)
+        } else if (cleaned.startsWith("+49") || defaultCountry == "DE") {
+            val cc = "49"
+            val nat = if (cleaned.startsWith("+49") || (onlyDigits.startsWith("49") && onlyDigits.length >= 11)) onlyDigits.substring(2) else if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits
+            return NormalizedParse("+49$nat", cc, nat, 10, true)
+        } else if (cleaned.startsWith("+61") || defaultCountry == "AU") {
+            val cc = "61"
+            val nat = if (cleaned.startsWith("+61") || (onlyDigits.startsWith("61") && onlyDigits.length >= 10)) onlyDigits.substring(2) else if (onlyDigits.length >= 9) onlyDigits.substring(onlyDigits.length - 9) else onlyDigits
+            return NormalizedParse("+61$nat", cc, nat, 9, true)
+        } else if (cleaned.startsWith("+81") || defaultCountry == "JP") {
+            val cc = "81"
+            val nat = if (cleaned.startsWith("+81") || (onlyDigits.startsWith("81") && onlyDigits.length >= 11)) onlyDigits.substring(2) else if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits
+            return NormalizedParse("+81$nat", cc, nat, 10, true)
+        } else {
+            val cc = if (onlyDigits.length >= 3) onlyDigits.substring(0, 3) else onlyDigits
+            val nat = if (onlyDigits.length > 3) onlyDigits.substring(3) else onlyDigits
+            return NormalizedParse("+$cc$nat", cc, nat, 10, onlyDigits.length in 7..15)
+        }
+    }
+
+    fun extractFeatures(rawNumber: String?, defaultCountry: String = "IN"): FloatArray {
+        val vec = FloatArray(36)
+        val parse = normalizeAndParse(rawNumber, defaultCountry)
+        if (parse.nationalNumber.isEmpty()) return vec
+
+        val onlyDigits = rawNumber?.trim()?.replace(Regex("[^\\d]"), "") ?: ""
+        val natLen = parse.nationalNumber.length
+        val fullE164 = parse.e164
+        val countryCodeStr = parse.countryCode
+        val natNumStr = parse.nationalNumber
 
         // 0. Validity
-        vec[0] = if (isValid) 1.0f else 0.0f
+        vec[0] = if (parse.isValid) 1.0f else 0.0f
 
         // 1. National length normalized
         vec[1] = min(natLen.toFloat() / 15.0f, 1.0f)
 
         // 2. Length discrepancy
-        vec[2] = min(abs(natLen - stdLength).toFloat() / 15.0f, 1.0f)
+        vec[2] = min(abs(natLen - parse.stdLength).toFloat() / 15.0f, 1.0f)
 
         // 3. Shannon Entropy
         val entropy = computeEntropy(natNumStr)
@@ -209,7 +200,7 @@ object PhoneNumberFeatureExtractor {
         vec[20] = if (isWangiri) 1.0f else 0.0f
 
         // 21. Telemarketing series
-        val isTelemarketing = TELEMARKETING_REGEXES.any { it.containsMatchIn(fullE164) || it.containsMatchIn(cleaned) }
+        val isTelemarketing = TELEMARKETING_REGEXES.any { it.containsMatchIn(fullE164) || it.containsMatchIn(rawNumber ?: "") }
         vec[21] = if (isTelemarketing) 1.0f else 0.0f
 
         // 22. Unallocated exchange code
@@ -221,12 +212,12 @@ object PhoneNumberFeatureExtractor {
         vec[22] = if (isUnallocated) 1.0f else 0.0f
 
         // 23. Shortcode spoof
-        vec[23] = if (natLen <= 6 && cleaned.startsWith("+")) 1.0f else 0.0f
+        vec[23] = if (natLen <= 6 && (rawNumber?.trim()?.startsWith("+") == true)) 1.0f else 0.0f
 
         // 24. Hard Negative Bank
         var isBank = isTollfree
         if (!isBank) {
-            isBank = BANK_REGEXES.any { it.containsMatchIn(fullE164) || it.containsMatchIn(cleaned) }
+            isBank = BANK_REGEXES.any { it.containsMatchIn(fullE164) || it.containsMatchIn(rawNumber ?: "") }
         }
         vec[24] = if (isBank) 1.0f else 0.0f
 

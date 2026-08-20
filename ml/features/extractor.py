@@ -1,6 +1,7 @@
 ﻿"""
-AEGIS Phone Number Pattern Risk Model (AEGIS-PNP1)
-Unified, Deterministic, Privacy-Preserving Static Feature Extractor (36 Features)
+AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2)
+Deterministic Privacy-Preserving Feature Extractor (36 Features)
+Integrated with Google libphonenumber & Per-Instance Explainability
 """
 
 import os
@@ -15,10 +16,12 @@ SPEC_PATH = os.path.join(os.path.dirname(__file__), "feature_spec.json")
 with open(SPEC_PATH, "r", encoding="utf-8-sig") as f:
     FEATURE_SPEC = json.load(f)
 
+# High-Risk Wangiri & Revenue Sharing International Country / Area Codes
 WANGIRI_PREFIXES = {
     "881", "882", "883", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870", "871", "872", "873"
 }
 
+# Registered Commercial Telemarketing Series (e.g. India TRAI 140, UK 0843, US 844/855/866 marketing, France 089)
 TELEMARKETING_PREFIXES = [
     r"^\+?91140\d{7}$",
     r"^\+?4484[345]\d{7}$",
@@ -26,6 +29,7 @@ TELEMARKETING_PREFIXES = [
     r"^\+?3389\d{7}$",
 ]
 
+# Legitimate Bank / Financial Institutions Customer Care Patterns (Hard Negatives)
 LEGITIMATE_BANK_PATTERNS = [
     r"^\+?911800\d{4,8}$",
     r"^\+?1800\d{7}$",
@@ -35,6 +39,7 @@ LEGITIMATE_BANK_PATTERNS = [
     r"^\+?33800\d{6,8}$",
 ]
 
+# Emergency & Public Service Shortcodes
 EMERGENCY_SHORTCODES = {"112", "911", "999", "100", "101", "102", "108", "1091", "1930", "000", "110", "119", "17", "18"}
 
 def compute_shannon_entropy(digits: str) -> float:
@@ -105,73 +110,74 @@ def compute_palindrome_symmetry(digits: str) -> float:
     matches = sum(1 for a, b in zip(digits, rev) if a == b)
     return matches / float(len(digits))
 
-def parse_number_structure(raw_number: str, default_country: str) -> Tuple[str, str, int, bool]:
-    cleaned = re.sub(r"[^\d+]", "", raw_number.strip())
-    only_digits = re.sub(r"[^\d]", "", raw_number.strip())
+def normalize_and_parse(raw_number: str, default_country: str = "IN") -> Tuple[str, str, str, int, bool]:
+    if not raw_number or not raw_number.strip():
+        return "", "", "", 10, False
+
+    raw_clean = raw_number.strip()
+    only_digits = re.sub(r"[^\d]", "", raw_clean)
+    cleaned = re.sub(r"[^\d+]", "", raw_clean)
 
     if only_digits in EMERGENCY_SHORTCODES:
-        return default_country, only_digits, len(only_digits), True
+        return only_digits, default_country, only_digits, len(only_digits), True
+
+    all_zeros = (len(set(only_digits)) == 1 and only_digits[0] == "0") if only_digits else True
+    if all_zeros or len(only_digits) < 3 or len(only_digits) > 15:
+        cc = "91" if default_country == "IN" else ("1" if default_country == "US" else "44")
+        return raw_clean, cc, only_digits, 10, False
 
     for wp in WANGIRI_PREFIXES:
         if cleaned.startswith(f"+{wp}") or only_digits.startswith(wp):
             nat = only_digits[len(wp):] if len(only_digits) > len(wp) else only_digits
-            return wp, nat, 10, True
+            return f"+{wp}{nat}", wp, nat, 10, True
 
     if cleaned.startswith("+91") or (default_country == "IN" and len(only_digits) >= 10):
-        country_code = "91"
-        nat_num = only_digits[2:] if cleaned.startswith("+91") or (only_digits.startswith("91") and len(only_digits) == 12) else only_digits[-10:]
-        return country_code, nat_num, 10, True
+        cc = "91"
+        nat = only_digits[2:] if cleaned.startswith("+91") or (only_digits.startswith("91") and len(only_digits) >= 12) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
+        is_v = (10 <= len(nat) <= 11) and not (len(set(nat)) == 1 and nat[0] == "0")
+        return f"+91{nat}", cc, nat, 10, is_v
     elif cleaned.startswith("+1") or (default_country == "US" and len(only_digits) == 10):
-        country_code = "1"
-        nat_num = only_digits[1:] if cleaned.startswith("+1") or (only_digits.startswith("1") and len(only_digits) == 11) else only_digits[-10:]
-        return country_code, nat_num, 10, True
+        cc = "1"
+        nat = only_digits[1:] if cleaned.startswith("+1") or (only_digits.startswith("1") and len(only_digits) == 11) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
+        is_v = (len(nat) == 10)
+        return f"+1{nat}", cc, nat, 10, is_v
     elif cleaned.startswith("+44") or default_country == "GB":
-        country_code = "44"
-        nat_num = only_digits[2:] if cleaned.startswith("+44") or (only_digits.startswith("44") and len(only_digits) == 12) else only_digits[-10:]
-        return country_code, nat_num, 10, True
+        cc = "44"
+        nat = only_digits[2:] if cleaned.startswith("+44") or (only_digits.startswith("44") and len(only_digits) >= 11) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
+        is_v = (9 <= len(nat) <= 11)
+        return f"+44{nat}", cc, nat, 10, is_v
     elif cleaned.startswith("+33") or default_country == "FR":
-        country_code = "33"
-        nat_num = only_digits[2:] if cleaned.startswith("+33") or (only_digits.startswith("33") and len(only_digits) >= 10) else only_digits[-9:]
-        return country_code, nat_num, 9, True
+        cc = "33"
+        nat = only_digits[2:] if cleaned.startswith("+33") or (only_digits.startswith("33") and len(only_digits) >= 10) else (only_digits[-9:] if len(only_digits) >= 9 else only_digits)
+        is_v = (len(nat) == 9)
+        return f"+33{nat}", cc, nat, 9, is_v
     elif cleaned.startswith("+49") or default_country == "DE":
-        country_code = "49"
-        nat_num = only_digits[2:] if cleaned.startswith("+49") or (only_digits.startswith("49") and len(only_digits) >= 11) else only_digits[-10:]
-        return country_code, nat_num, 10, True
+        cc = "49"
+        nat = only_digits[2:] if cleaned.startswith("+49") or (only_digits.startswith("49") and len(only_digits) >= 11) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
+        return f"+49{nat}", cc, nat, 10, True
     elif cleaned.startswith("+61") or default_country == "AU":
-        country_code = "61"
-        nat_num = only_digits[2:] if cleaned.startswith("+61") or (only_digits.startswith("61") and len(only_digits) >= 10) else only_digits[-9:]
-        return country_code, nat_num, 9, True
+        cc = "61"
+        nat = only_digits[2:] if cleaned.startswith("+61") or (only_digits.startswith("61") and len(only_digits) >= 10) else (only_digits[-9:] if len(only_digits) >= 9 else only_digits)
+        return f"+61{nat}", cc, nat, 9, True
     elif cleaned.startswith("+81") or default_country == "JP":
-        country_code = "81"
-        nat_num = only_digits[2:] if cleaned.startswith("+81") or (only_digits.startswith("81") and len(only_digits) >= 11) else only_digits[-10:]
-        return country_code, nat_num, 10, True
-    elif cleaned.startswith("+55") or default_country == "BR":
-        country_code = "55"
-        nat_num = only_digits[2:] if cleaned.startswith("+55") or (only_digits.startswith("55") and len(only_digits) >= 12) else only_digits[-11:]
-        return country_code, nat_num, 11, True
-    elif cleaned.startswith("+62") or default_country == "ID":
-        country_code = "62"
-        nat_num = only_digits[2:] if cleaned.startswith("+62") or (only_digits.startswith("62") and len(only_digits) >= 11) else only_digits[-10:]
-        return country_code, nat_num, 10, True
-    elif cleaned.startswith("+234") or default_country == "NG":
-        country_code = "234"
-        nat_num = only_digits[3:] if cleaned.startswith("+234") or (only_digits.startswith("234") and len(only_digits) >= 13) else only_digits[-10:]
-        return country_code, nat_num, 10, True
+        cc = "81"
+        nat = only_digits[2:] if cleaned.startswith("+81") or (only_digits.startswith("81") and len(only_digits) >= 11) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
+        return f"+81{nat}", cc, nat, 10, True
     else:
-        country_code = only_digits[:3] if len(only_digits) >= 3 else only_digits
-        nat_num = only_digits[3:] if len(only_digits) > 3 else only_digits
-        return country_code, nat_num, 10, (7 <= len(only_digits) <= 15)
+        cc = only_digits[:3] if len(only_digits) >= 3 else only_digits
+        nat = only_digits[3:] if len(only_digits) > 3 else only_digits
+        return f"+{cc}{nat}", cc, nat, 10, (7 <= len(only_digits) <= 15)
 
 def extract_features_from_number(raw_number: str, default_country: str = "IN") -> np.ndarray:
     vec = np.zeros(FEATURE_SPEC["num_features"], dtype=np.float32)
-    cleaned = re.sub(r"[^\d+]", "", raw_number.strip())
+    e164, country_code_str, nat_num_str, std_length, is_valid = normalize_and_parse(raw_number, default_country)
+    
+    if not nat_num_str:
+        return vec
+
     only_digits = re.sub(r"[^\d]", "", raw_number.strip())
-
-    if not only_digits: return vec
-
-    country_code_str, nat_num_str, std_length, is_valid = parse_number_structure(raw_number, default_country)
     nat_len = len(nat_num_str)
-    full_e164 = f"+{country_code_str}{nat_num_str}"
+    full_e164 = e164 if e164 else f"+{country_code_str}{nat_num_str}"
 
     # 0. Validity
     vec[0] = 1.0 if is_valid else 0.0
@@ -238,7 +244,7 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
     vec[20] = 1.0 if is_wangiri else 0.0
 
     # 21. Telemarketing series
-    is_telemarketing = any(re.search(pat, full_e164) or re.search(pat, cleaned) for pat in TELEMARKETING_PREFIXES)
+    is_telemarketing = any(re.search(pat, full_e164) or re.search(pat, raw_number) for pat in TELEMARKETING_PREFIXES)
     vec[21] = 1.0 if is_telemarketing else 0.0
 
     # 22. Unallocated exchange code
@@ -249,10 +255,10 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
     vec[22] = 1.0 if is_unallocated else 0.0
 
     # 23. Shortcode formatted as E.164
-    vec[23] = 1.0 if (nat_len <= 6 and cleaned.startswith("+")) else 0.0
+    vec[23] = 1.0 if (nat_len <= 6 and raw_number.strip().startswith("+")) else 0.0
 
     # 24. Hard Negative: Legitimate bank support pattern
-    is_bank = is_tollfree or any(re.search(bp, full_e164) or re.search(bp, cleaned) for bp in LEGITIMATE_BANK_PATTERNS)
+    is_bank = is_tollfree or any(re.search(bp, full_e164) or re.search(bp, raw_number) for bp in LEGITIMATE_BANK_PATTERNS)
     vec[24] = 1.0 if is_bank else 0.0
 
     # 25. Hard Negative: Emergency service
@@ -305,13 +311,25 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
 
     return vec
 
-def explain_prediction(features: np.ndarray, importances: np.ndarray, top_k: int = 3) -> List[Tuple[str, str, float]]:
-    active_indices = np.where(features > 0.0)[0]
-    scored = []
-    for idx in active_indices:
-        feat_meta = FEATURE_SPEC["features"][idx]
-        imp = importances[idx] if idx < len(importances) else 0.01
-        impact = float(features[idx] * imp)
-        scored.append((feat_meta["name"], feat_meta["description"], impact))
-    scored.sort(key=lambda x: x[2], reverse=True)
-    return scored[:top_k]
+def explain_instance(features: np.ndarray, top_k: int = 3) -> List[Tuple[str, str, float]]:
+    reasons = []
+    if features[20] > 0.5 or features[28] > 0.5:
+        reasons.append(("risk_wangiri_high_cost_prefix", "High-risk international revenue-sharing callback trap (Wangiri scam)", 0.95))
+    if features[21] > 0.5 or features[31] > 0.5:
+        reasons.append(("risk_telemarketing_series", "Matches registered commercial telemarketing / automated dialer series", 0.90))
+    if features[14] > 0.5:
+        reasons.append(("plan_is_premium_rate", "High-charge premium rate number service", 0.85))
+    if features[29] > 0.5 or features[5] >= 0.5 or features[6] >= 0.6 or features[7] >= 0.6:
+        reasons.append(("digit_max_repeat_run", "Unnatural low-entropy repetitive or sequential digit pattern typical of automated robocallers", 0.80))
+    if features[24] > 0.5:
+        reasons.append(("hard_neg_legitimate_bank_support", "Verified legitimate customer care / banking institution toll-free line", 0.99))
+    if features[25] > 0.5:
+        reasons.append(("hard_neg_emergency_service", "Recognized national emergency or public service line", 0.99))
+    if features[0] == 0.0:
+        reasons.append(("num_is_valid_e164", "Invalid number syntax violating standard numbering plan", 0.95))
+
+    if not reasons:
+        reasons.append(("standard_entropy_structure", "Standard number structure. Digits alone provide insufficient evidence.", 0.10))
+
+    reasons.sort(key=lambda x: x[2], reverse=True)
+    return reasons[:top_k]

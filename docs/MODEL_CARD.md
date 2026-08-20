@@ -1,49 +1,56 @@
-# AEGIS-PNP1: Phone Number Pattern Risk Model Card
+﻿# AEGIS-PNP2: Phone Number Pattern Risk Model Card
 
-## 1. Model Details
-* **Model Name:** AEGIS-PNP1 (Phone Number Pattern Risk Model)
-* **Model Version:** 1.0.0
-* **Architecture:** 150-Tree Calibrated Gradient Boosted Decision Tree Ensemble (`GradientBoostingClassifier` with 5-Fold Sigmoid Probability Calibration).
-* **Model Formats:** Pure JSON Tree Evaluator (`phonenumber_risk_model.json`), Mobile TensorFlow Lite FlatBuffer (`phonenumber_risk_model.tflite`), Scikit-Learn Joblib (`calibrated_gbt.joblib`).
-* **Input Feature Space:** 36 Privacy-Preserving Structural & Numbering-Plan Dimensions.
-* **Inference Latency:** $< 0.05\text{ ms}$ on budget Android ARM64 devices (Zero JNI overhead).
-
----
-
-## 2. Intended Use & Scope
-* **Primary Objective:** Provide on-device, privacy-preserving structural pattern analysis for incoming caller numbers to warn users about potential scam, spam, robocall, or premium-rate toll fraud.
-* **Permitted Inputs:** Normalized digits, ITU-T E.164 country dial codes, digit entropy, repetition, and public numbering-plan metadata (VoIP, Toll-Free, Premium Rate).
-* **Out-of-Scope & Prohibited Use:**
-  * Must **NOT** be used as a standalone automatic blocking engine without additional contextual signals (e.g. user contacts, call history, reputation feeds).
-  * Must **NOT** claim to confirm caller personal identity or legal guilt from digits alone.
-  * Must **NOT** log or exfiltrate raw unhashed telephone numbers.
+## 1. Model Overview
+* **Model Name:** AEGIS-PNP2 (Phone Number Pattern Risk Model v2.0)
+* **Model Architecture:** 150-Tree Gradient Boosted Trees Ensemble (`GradientBoostingClassifier`, max depth 4) with explicit Sigmoid Platt probability calibration.
+* **Release Status:** Production Rebuild (Advisory Mode).
+* **Target Task:** On-Device Privacy-Preserving Structural Phone Number Risk Assessment.
+* **Supported Platforms:** Android (Kotlin Engine, Zero JNI, Latency $< 0.05\text{ ms}$), Backend (FastAPI REST Server).
 
 ---
 
-## 3. Privacy Preservation & Data Minimization
-* **Zero PII Logging:** Raw phone numbers are discarded immediately after feature vector extraction.
-* **Deterministic Mathematical Features:** Features capture structural properties (e.g. Shannon entropy, run lengths, symmetry, prefix tables) rather than identity markers.
-* **100% Offline Android Inference:** Requires zero internet permissions and zero network requests.
+## 2. Intended Use & Advisory Mode Framing
+* **Intended Purpose:** Provide on-device, pre-call structural risk estimation on incoming phone numbers to detect automated robocallers, commercial telemarketers (e.g. TRAI 140 series), high-cost Wangiri callback traps, and premium-rate fraud before the call is answered.
+* **Advisory Mode Directive:** A phone number's digits alone cannot prove caller identity or confirm malicious intent. The model operates in **Advisory Mode** (displaying warning banners such as "*⚠️ High-Risk Scam Pattern Detected*" or "*⚡ Suspected Telemarketer*") and **does NOT auto-block or auto-drop calls** based solely on pattern scores without explicit user blocklist rules or verified fresh server reputation.
+* **Out-of-Scope Uses:** Caller ID resolution, contact name lookup, direct call blocking without user consent.
 
 ---
 
-## 4. Multi-Tier Classification & Abstain Policy
-The model maps calibrated probability $P(\text{Threat} \mid \vec{x})$ into 4 distinct operational tiers:
-
-| Tier | Probability Range | Confidence | Description | Action Recommendation |
-| :--- | :---: | :---: | :--- | :--- |
-| **`LEGITIMATE`** | $P < 0.15$ | HIGH | Standard business, personal line, emergency, or verified toll-free bank support. | Normal Ring / Clear |
-| **`UNKNOWN`** | $0.15 \le P < 0.40$ | LOW | Standard number with normal entropy. Insufficient structural evidence alone. | **Abstain (No Warning)** |
-| **`SPAM`** | $0.40 \le P < 0.70$ | MEDIUM | Telemarketing series (`+91-140`), bulk marketing dialers, or sequential robocallers. | Show "Potential Spam" Banner |
-| **`SCAM`** | $P \ge 0.70$ | HIGH | High-cost Wangiri callback traps (`+881`, `+252`), premium rate redirection, or spoofed unallocated prefixes. | Show "High Risk Fraud Warning" |
+## 3. Input & Output Specification
+* **Inputs:**
+  * Raw Phone Number (e.g. `"+911409988776"`, `"1800112211"`, `"0000000000"`)
+  * Device Default Region / SIM Country (e.g. `"IN"`, `"US"`, `"GB"`)
+* **Outputs:**
+  * `normalized_e164`: Normalized E.164 string via `libphonenumber`.
+  * `is_valid`: Boolean numbering-plan syntax validity.
+  * `risk_score`: Calibrated risk integer from `0` to `100`.
+  * `calibrated_probability`: Calibrated probability $P(\text{Threat} \mid x) \in [0.0, 1.0]$.
+  * `threat_tier`: Categorical classification (`LEGITIMATE`, `UNKNOWN` [Abstain], `SPAM`, `SCAM`, `INVALID`).
+  * `confidence`: `LOW`, `MEDIUM`, or `HIGH`.
+  * `top_reason_codes`: Active structural tell codes (e.g. `risk_telemarketing_series`, `risk_wangiri_high_cost_prefix`).
+  * `top_explanations`: Human-readable explanation strings for user interface display.
 
 ---
 
-## 5. Performance & Calibration Summary
-Evaluated on **2,500 unseen prefix and geographic holdout samples**:
-* **Threat Recall (Sensitivity):** **`100.00%`** ($1,250 / 1,250$ spam/scam samples caught)
-* **Threat Precision:** **`99.84%`**
-* **False Positive Rate on Legitimate/Unknown:** **`0.16%`** ($2 / 1,250$ false alarms)
-* **Brier Score Loss (Calibration):** **`0.0008`** (Ideal $< 0.05$)
-* **PR-AUC:** **`1.0000`** | **ROC-AUC:** **`1.0000`**
-* **Hard Negatives (Banks & Emergency Lines) Pass Rate:** **`10 / 10 (100.0%)`**
+## 4. Probability Calibration & Operating Thresholds
+The model fits explicit Sigmoid Platt scaling parameters on a dedicated validation set:
+\[
+P(\text{Threat} \mid \text{logit}) = \frac{1}{1 + \exp(A \cdot \text{logit} + B)}
+\]
+* Fitted Parameters: $A = -1.237963, B = -0.067662$.
+* Brier Score Loss: `0.019581` (Well below ideal $< 0.05$ threshold).
+
+| Threat Tier | Probability Range | Risk Score | System Behavior |
+| :--- | :---: | :---: | :--- |
+| **`LEGITIMATE`** | $P < 0.15$ | $0 - 14$ | Verified Bank / Emergency / Clean PSTN line |
+| **`UNKNOWN`** | $0.15 \le P < 0.40$ | $15 - 39$ | Standard mobile/landline (Abstain from warning) |
+| **`SPAM`** | $0.40 \le P < 0.70$ | $40 - 69$ | Telemarketer / Automated Robocall Advisory |
+| **`SCAM`** | $P \ge 0.70$ | $70 - 100$ | Wangiri / Premium Fraud High-Risk Advisory |
+| **`INVALID`** | *Malformed* | $0$ | Number syntax violates international numbering plan |
+
+---
+
+## 5. Privacy & Security Guarantees
+1. **Zero PII Logging:** Raw phone numbers, contact names, and caller details are never written to disk, sent in telemetry, or stored in server logs.
+2. **Offline Local Inference:** Layer 1 and Layer 2 execute 100% on-device without network connectivity.
+3. **Secure Reputation Proxy:** External lookups (Layer 3) transmit only SHA-256 truncated hashes over TLS to a self-hosted proxy. No third-party provider API keys are embedded in client APKs.

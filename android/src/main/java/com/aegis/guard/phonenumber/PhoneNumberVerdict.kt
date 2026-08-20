@@ -4,7 +4,8 @@ enum class ThreatTier {
     LEGITIMATE,
     UNKNOWN,
     SPAM,
-    SCAM
+    SCAM,
+    INVALID
 }
 
 enum class ConfidenceLevel {
@@ -15,13 +16,16 @@ enum class ConfidenceLevel {
 
 data class PhoneNumberVerdict(
     val rawNumber: String,
+    val normalizedE164: String,
     val country: String,
     val riskScore: Int,
-    val probability: Float,
+    val rawLogit: Float,
+    val calibratedProbability: Float,
     val tier: ThreatTier,
     val confidence: ConfidenceLevel,
     val isThreat: Boolean,
     val isAbstain: Boolean,
+    val isInvalid: Boolean,
     val topReasonCodes: List<String>,
     val topExplanations: List<String>
 )

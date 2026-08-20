@@ -1,7 +1,7 @@
 {
   "num_features": 36,
   "scaling_type": "min_max_normalization",
-  "description": "Deterministic scaling parameters for AEGIS Phone Number Pattern Risk Model",
+  "description": "Deterministic scaling parameters for AEGIS-PNP2",
   "features": [
     {
       "index": 0,

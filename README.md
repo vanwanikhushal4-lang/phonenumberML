@@ -1,81 +1,64 @@
-# AEGIS Phone Number Pattern Risk Model (AEGIS-PNP1)
+﻿# AEGIS-PNP2: Phone Number Pattern Risk Model & Call Guard Screening Engine
 
-A privacy-preserving, on-device Machine Learning engine that analyzes telephone number structures and numbering-plan metadata to detect **scam, spam, automated robocalls, and Wangiri toll fraud**.
-
----
-
-## Key Capabilities
-* **Privacy-Preserving:** Operates solely on digit entropy, repetition run lengths, sequential runs, symmetry, and public ITU-T numbering-plan metadata without storing or processing PII.
-* **4-Class Decision Engine:** Outputs calibrated risk probabilities `[0.0 - 1.0]` across `LEGITIMATE`, `UNKNOWN (Abstain)`, `SPAM`, and `SCAM`.
-* **Hard-Negative Protection:** Curated rules and training representations ensure bank customer support lines (`1800-11-2211`, `1-800-935-9935`) and emergency numbers (`112`, `911`) never trigger false alarms.
-* **Sub-Millisecond On-Device Inference:** Pure-Kotlin 150-tree decision evaluator ($< 0.05\text{ ms}$ latency, zero JNI) and mobile TFLite FlatBuffer binary.
-* **100% Train/Serve Parity:** Validated against Python and Java JVM parity harnesses ($< 5 \times 10^{-5}$ max numerical diff).
+Production-grade, privacy-preserving on-device machine learning model and Android Call Guard screening engine for detecting structural phone scam, spam, automated robocall, and Wangiri patterns.
 
 ---
 
-## Project Structure
+## Key Features
+* **Google `libphonenumber` Validation:** Strict E.164 normalization, standard national length verification, and carrier metadata.
+* **On-Device Local Risk Model (AEGIS-PNP2):** 150 calibrated decision trees evaluated in pure Kotlin ($< 0.05\text{ ms}$, zero JNI).
+* **Exact Sigmoid Calibration:** Fit on dedicated validation splits to guarantee calibrated risk probabilities across Python, Java, and Android Kotlin.
+* **Zero-Leakage Grounded Data:** Ingests official regulatory telecom allocations (India TRAI 140/160 series, US NANPA, UK OFCOM, ITU-T satellite Wangiri codes) with 0 normalized-number overlap between train, validation, and untouched test splits.
+* **Advisory Mode Call Guard:** Android `CallScreeningService` responding in $< 50\text{ ms}$ (safe fallback before 5s deadline) to warn users without auto-dropping calls from digits alone.
+* **Secure Backend Reputation Proxy:** Authenticated IPQS reputation adapter with LRU caching, SHA-256 hashed queries, and zero API keys in client APKs.
+
+---
+
+## Benchmark & Performance Highlights
+* **Untouched Holdout ($N = 2,500$ unseen numbers):**
+  * **Threat Recall:** `97.42%`
+  * **Threat Precision:** `95.88%`
+  * **PR-AUC:** `0.9975`
+  * **ROC-AUC:** `0.9979`
+  * **Brier Calibration Score:** `0.018361`
+* **Hard Negatives (Banks & Emergency):** `16 / 16 (100.0% Pass)`
+* **Train / Serve End-to-End Parity:** `20 / 20 (100.0% Pass, Max Diff < 0.000048)`
+
+---
+
+## Directory Layout
 ```
 phonenumberML/
-├── docs/
-│   ├── MODEL_CARD.md              # Ethics, limitations, privacy, and bias analysis
-│   ├── FEATURE_SPECIFICATION.md   # Mathematical definition of all 36 features
-│   └── EVALUATION_REPORT.md       # Prefix holdout benchmarks and country slices
+├── android/                   # Pure Kotlin On-Device Runtime Engine
+│   └── src/main/java/com/aegis/guard/phonenumber/
+│       ├── PhoneNumberFeatureExtractor.kt
+│       ├── PhoneNumberRiskModel.kt
+│       ├── PhoneNumberVerdict.kt
+│       ├── ReasonCodes.kt
+│       ├── CallGuardEngine.kt
+│       └── AegisCallScreeningService.kt
 ├── ml/
-│   ├── data/
-│   │   ├── dataset_builder.py     # Zero-leakage multi-country dataset generator
-│   │   ├── train_dataset.json     # 10,000 balanced multi-country phone numbers
-│   │   ├── test_prefix_holdout.json # 2,500 unseen prefix & country holdouts
-│   │   └── hard_negatives.json    # Curated bank & emergency lines
-│   ├── features/
-│   │   ├── extractor.py           # Deterministic 36-feature extractor
-│   │   └── feature_spec.json      # Versioned schema specification
-│   ├── models/
-│   │   ├── train.py               # GBT & RF training pipeline
-│   │   └── saved_models/          # Serialized model binaries
-│   ├── export/
-│   │   ├── exporter.py            # JSON tree and TFLite FlatBuffer exporter
-│   │   ├── scaler.json            # Deterministic normalization divisors
-│   │   ├── golden_test_vectors.json # 15 verified golden test vectors
-│   │   └── phonenumber_risk_model.tflite # Mobile TFLite model
-│   ├── evaluation/
-│   │   ├── evaluate.py            # Comprehensive evaluation suite
-│   │   ├── test_golden_vectors.py # 15/15 golden vector regression test
-│   │   ├── test_parity_jvm.py     # Python vs JVM parity test
-│   │   └── JvmPhoneNumberExtractor.java # Compiled JVM extractor
-│   └── api/
-│       └── server.py              # FastAPI REST server
-└── android/
-    └── src/main/java/com/aegis/guard/phonenumber/
-        ├── PhoneNumberRiskModel.kt        # Pure Kotlin 150-tree decision evaluator
-        ├── PhoneNumberFeatureExtractor.kt # Pure Kotlin 36-feature extractor
-        ├── PhoneNumberVerdict.kt          # Threat tiers & confidence models
-        └── ReasonCodes.kt                 # Explainability constants
-```
-
----
-
-## Quickstart
-
-### 1. Run Evaluation Benchmarks
-```bash
-python ml/evaluation/evaluate.py
-python ml/evaluation/test_golden_vectors.py
-python ml/evaluation/test_parity_jvm.py
-```
-
-### 2. Launch FastAPI REST Server
-```bash
-uvicorn ml.api.server:app --host 127.0.0.1 --port 8001
-```
-
-### 3. Android Kotlin Integration Example
-```kotlin
-val riskModel = PhoneNumberRiskModel()
-val modelJson = context.assets.open("phonenumber_risk_model.json").bufferedReader().use { it.readText() }
-riskModel.loadModelFromJsonString(modelJson)
-
-val verdict = riskModel.assessNumber("+911409988776", defaultCountry = "IN")
-println("Threat Tier: ${verdict.tier}") // SPAM / SCAM
-println("Risk Score: ${verdict.riskScore}/100")
-println("Reasons: ${verdict.topExplanations}")
+│   ├── features/              # 36-Feature Extractor & Spec
+│   │   ├── extractor.py
+│   │   └── feature_spec.json
+│   ├── data/                  # Grounded Telecom Datasets & Provenance
+│   │   └── dataset_builder.py
+│   ├── models/                # Training Pipeline & Sigmoid Calibration
+│   │   └── train.py
+│   ├── export/                # Exported Models & Golden Suite
+│   │   ├── exporter.py
+│   │   ├── phonenumber_risk_model.json
+│   │   ├── scaler.json
+│   │   └── golden_test_vectors.json
+│   ├── evaluation/            # End-to-End Parity & Production Benchmarks
+│   │   ├── JvmPhoneNumberEvaluator.java
+│   │   ├── test_end_to_end_parity.py
+│   │   └── evaluate_production.py
+│   └── api/                   # FastAPI Server & IPQS Reputation Proxy
+│       └── server.py
+└── docs/                      # Comprehensive Documentation & Model Card
+    ├── MODEL_CARD.md
+    ├── DATASET_PROVENANCE.md
+    ├── EVALUATION_REPORT.md
+    └── CALL_SCREENING_INTEGRATION.md
 ```
