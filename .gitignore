@@ -6,3 +6,13 @@ __pycache__/
 .idea/
 .vscode/
 *.log
+
+# Gradle & Android build outputs
+.gradle/
+**/build/
+android/build/
+android/.gradle/
+
+# Unstable intermediate Python binaries (release artifacts are exported JSON)
+ml/models/saved_models/*.joblib
+ml/models/saved_models/*.npy

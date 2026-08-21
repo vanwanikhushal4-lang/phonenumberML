@@ -86,9 +86,12 @@ def main():
     run_step("5/6 Production Holdout Evaluation & Benchmark Report", [PYTHON, "ml/evaluation/evaluate_production.py"])
 
     # 6. Backend API Security, Authentication & Rate Limiting Tests
-    run_step("6/6 Backend API Security, Authentication & Rate Limiting Tests", [PYTHON, "-m", "unittest", "ml/api/test_server.py"])
+    run_step("6/8 Backend API Security, Authentication & Rate Limiting Tests", [PYTHON, "-m", "unittest", "ml/api/test_server.py"])
 
-    # 7. Clean Worktree Verification
+    # 7. Negative Semantic Controls & Deliberate Regression Gate Tests
+    run_step("7/8 Negative Semantic Controls & Deliberate Regression Gate Tests", [PYTHON, "-m", "unittest", "ml/evaluation/test_negative_semantic_controls.py"])
+
+    # 8. Clean Worktree Verification
     verify_clean_worktree()
 
     print("\n" + "="*90)

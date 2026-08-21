@@ -1,4 +1,4 @@
-package com.aegis.guard.phonenumber
+﻿package com.aegis.guard.phonenumber
 
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -8,9 +8,9 @@ import java.io.File
 import kotlin.math.abs
 
 /**
- * Unit & Cross-Runtime Parity Test Suite for AEGIS-PNP2 Android Kotlin Runtime.
+ * Unit, Parity & Negative Control Test Suite for AEGIS-PNP2 Android Kotlin Runtime.
  * Loads committed phonenumber_risk_model.json asset and asserts all 39 canonical golden test cases
- * against reference Python feature extractions, raw logits, calibrated probabilities, and tier decisions.
+ * against independent authored semantic expectations and reference numeric predictions.
  */
 class PhoneNumberRiskModelTest {
 
@@ -59,6 +59,7 @@ class PhoneNumberRiskModelTest {
             val expIsValid = caseObj.getBoolean("expected_is_valid")
             val expIsAbstain = caseObj.getBoolean("expected_is_abstain")
             val expIsInvalid = caseObj.getBoolean("expected_is_invalid")
+            val expE164 = caseObj.getString("expected_normalized_e164")
             val expRawLogit = caseObj.getDouble("reference_raw_logit")
             val expCalProb = caseObj.getDouble("reference_calibrated_probability")
             val expScore = caseObj.getInt("reference_score")
@@ -68,6 +69,7 @@ class PhoneNumberRiskModelTest {
 
             assertEquals("Case $caseId isValid mismatch", expIsValid, assessment.isValid)
             assertEquals("Case $caseId isInvalid mismatch", expIsInvalid, assessment.isInvalid)
+            assertEquals("Case $caseId E.164 mismatch", expE164, assessment.normalizedE164)
             assertEquals("Case $caseId tier mismatch", expTier, assessment.threatTier.name)
             assertEquals("Case $caseId isThreat mismatch", expIsThreat, assessment.isThreat)
             assertEquals("Case $caseId isAbstain mismatch", expIsAbstain, assessment.isAbstain)
@@ -97,6 +99,20 @@ class PhoneNumberRiskModelTest {
                 assertEquals("Case $caseId score mismatch", expScore, assessment.riskScore)
             }
         }
+    }
+
+    @Test
+    fun testBenignToSpamNegativeControlFailsAssertion() {
+        val sbiAssessment = riskModel.assessNumber("+911800112211", "IN")
+        assertEquals("SBI Bank must evaluate to LEGITIMATE", ThreatTier.LEGITIMATE, sbiAssessment.threatTier)
+        assertNotEquals("Flawed SPAM classification must not equal nominal outcome", ThreatTier.SPAM, sbiAssessment.threatTier)
+    }
+
+    @Test
+    fun testWangiriToLegitimateNegativeControlFailsAssertion() {
+        val wangiriAssessment = riskModel.assessNumber("+881631555123", "IN")
+        assertEquals("Wangiri trap must evaluate to SCAM", ThreatTier.SCAM, wangiriAssessment.threatTier)
+        assertNotEquals("Flawed LEGITIMATE classification must not equal nominal outcome", ThreatTier.LEGITIMATE, wangiriAssessment.threatTier)
     }
 
     @Test
@@ -137,8 +153,6 @@ class PhoneNumberRiskModelTest {
         val originalJsonStr = modelFile!!.readText()
 
         val json = JSONObject(originalJsonStr)
-        val originalChecksum = json.getString("sha256_checksum")
-
         val treesArray = json.getJSONArray("trees")
         val firstTree = treesArray.getJSONObject(0)
         val nodesArray = firstTree.getJSONArray("nodes")

@@ -1,9 +1,9 @@
-﻿# AEGIS-PNP2: Phone Number Pattern Risk Model Card
+# AEGIS-PNP2: Phone Number Pattern Risk Model Card
 
 ## 1. Model Overview
 * **Model Name:** AEGIS-PNP2 (Phone Number Pattern Risk Model v2.1)
 * **Model Objective:** `PATTERN_RISK` — Continuous structural risk probability estimation ($P \in [0.0, 1.0]$, scaled to $0 - 100$).
-* **Architecture:** 150-Tree Gradient Boosted Decision Tree Ensemble (`GradientBoostingRegressor`, max depth 4) with explicit Platt Sigmoid Scaling.
+* **Architecture:** 150-Tree Gradient Boosted Decision Tree Ensemble (`GradientBoostingRegressor`, max depth 5) with explicit Platt Sigmoid Scaling.
 * **Intended Platform:** Android Native (`CallGuardEngine.kt`, pure Kotlin, zero JNI, latency $< 0.05\text{ ms}$) and Backend Proxy (`server.py`, FastAPI).
 * **Release Status:** **Experimental Structural Pattern Risk Baseline (Advisory Mode)**.
 
@@ -22,8 +22,8 @@
 * **Outputs:**
   * `normalized_e164`: Normalized E.164 string via `libphonenumber`.
   * `is_valid`: Boolean numbering-plan syntax validity.
-  * `pattern_risk_score`: Calibrated risk integer from `0` to `100`.
-  * `calibrated_probability`: Calibrated probability $P(\text{Pattern Risk} \mid x) \in [0.0, 1.0]$.
+  * `pattern_risk_score`: Structural risk integer from `0` to `100` scaled from raw regression output ($\lfloor \min(1.0, \max(0.0, r(x))) \cdot 100 \rceil$).
+  * `calibrated_probability`: Calibrated probability $P(\text{Threat} \mid x) = \frac{1}{1 + e^{-(12.0786 \cdot r(x) - 4.1048)}} \in [0.0, 1.0]$.
   * `threat_tier`: Categorical classification (`LEGITIMATE`, `UNKNOWN` [Abstain], `SPAM`, `SCAM`, `INVALID`).
   * `confidence`: `LOW`, `MEDIUM`, or `HIGH`.
   * `top_reason_codes`: Active structural tell codes (e.g. `risk_telemarketing_series`, `risk_wangiri_high_cost_prefix`).

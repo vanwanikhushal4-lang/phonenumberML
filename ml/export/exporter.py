@@ -1,9 +1,9 @@
-"""
+﻿"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2) — Production Model Exporter
 Exports:
 1. phonenumber_risk_model.json with 150 trees, init_value, Platt parameters, SHA-256 integrity hash
 2. scaler.json
-3. golden_test_vectors.json with 39 canonical test cases including full reference features and probability outputs
+3. golden_test_vectors.json containing immutable independently authored semantic expectations + reference numeric predictions
 """
 
 import os
@@ -19,59 +19,7 @@ from ml.features.extractor import FEATURE_SPEC, extract_features_from_number, no
 MODELS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/saved_models"))
 EXPORT_DIR = os.path.dirname(__file__)
 ANDROID_ASSETS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../android/src/main/assets"))
-
-INDEPENDENT_GOLDEN_VECTORS = [
-    # 1. HARD NEGATIVES (Certified Banks & Emergency Helplines -> LEGITIMATE)
-    {"case_id": "sbi_bank_customer_care", "raw_number": "+911800112211", "country": "IN", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Bank Helpline"},
-    {"case_id": "hdfc_bank_priority", "raw_number": "+9118002026161", "country": "IN", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Bank Helpline"},
-    {"case_id": "chase_bank_support", "raw_number": "+18009359935", "country": "US", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Bank Helpline"},
-    {"case_id": "barclays_uk_care", "raw_number": "+44800123456", "country": "GB", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Bank Helpline"},
-    {"case_id": "us_tollfree_800_standard", "raw_number": "+18005550100", "country": "US", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "NANPA 800 Toll-Free Line"},
-    {"case_id": "emergency_112", "raw_number": "112", "country": "IN", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Emergency Shortcode"},
-    {"case_id": "emergency_911", "raw_number": "911", "country": "US", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Emergency Shortcode"},
-    {"case_id": "emergency_1930", "raw_number": "1930", "country": "IN", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Cyber Crime Helpline"},
-
-    # 2. TOLL-FREE REGRESSION COUNTEREXAMPLES (US 833, 844, 855, 866, 877, 888 -> UNKNOWN / Abstain)
-    {"case_id": "us_tollfree_833_standard", "raw_number": "+18335550101", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA 833 Toll-Free Line"},
-    {"case_id": "us_tollfree_844_standard", "raw_number": "+18445550102", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA 844 Toll-Free Line"},
-    {"case_id": "us_tollfree_855_standard", "raw_number": "+18555550103", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA 855 Toll-Free Line"},
-    {"case_id": "us_tollfree_866_standard", "raw_number": "+18665550104", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA 866 Toll-Free Line"},
-    {"case_id": "us_tollfree_877_standard", "raw_number": "+18775550105", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA 877 Toll-Free Line"},
-    {"case_id": "us_tollfree_888_standard", "raw_number": "+18885550106", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA 888 Toll-Free Line"},
-
-    # 3. SOVEREIGN COUNTRY MOBILE SUBSCRIBERS (Standard cellular subscribers -> UNKNOWN / Abstain)
-    {"case_id": "somalia_standard_mobile", "raw_number": "+252615551234", "country": "SO", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Somalia Cellular Subscriber"},
-    {"case_id": "sierra_leone_standard_mobile", "raw_number": "+23276123456", "country": "SL", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Sierra Leone Cellular Subscriber"},
-    {"case_id": "guinea_ordinary_mobile", "raw_number": "+224621234567", "country": "GN", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Guinea Cellular Subscriber"},
-    {"case_id": "tanzania_ordinary_mobile", "raw_number": "+255712345678", "country": "TZ", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Tanzania Cellular Subscriber"},
-    {"case_id": "burundi_ordinary_mobile", "raw_number": "+25779123456", "country": "BI", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Burundi Cellular Subscriber"},
-    {"case_id": "comoros_ordinary_mobile", "raw_number": "+2693212345", "country": "KM", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Comoros Cellular Subscriber"},
-    {"case_id": "standard_indian_mobile", "raw_number": "+919820481729", "country": "IN", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "India Cellular Subscriber"},
-    {"case_id": "standard_us_landline", "raw_number": "+12127363100", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "US Fixed Landline"},
-    {"case_id": "standard_uk_mobile", "raw_number": "+447911123456", "country": "GB", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "UK Cellular Subscriber"},
-    {"case_id": "standard_jp_mobile", "raw_number": "+819012345678", "country": "JP", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Japan Cellular Subscriber"},
-
-    # 4. TELEMARKETING & AUTOMATED ROBOCALLERS -> SPAM
-    {"case_id": "trai_140_telemarketer", "raw_number": "+911409988776", "country": "IN", "expected_tier": "SPAM", "expected_is_threat": True, "category": "TRAI 140 Marketing"},
-    {"case_id": "uk_0843_bulk_dialer", "raw_number": "+448431234567", "country": "GB", "expected_tier": "SPAM", "expected_is_threat": True, "category": "OFCOM Bulk Series"},
-    {"case_id": "low_entropy_dialer_all_repeats", "raw_number": "+917777777777", "country": "IN", "expected_tier": "SPAM", "expected_is_threat": True, "category": "Repeated Robocall Pattern"},
-    {"case_id": "counterexample_in_medium_spam", "raw_number": "+919472476956", "country": "IN", "expected_tier": "SPAM", "expected_is_threat": True, "category": "Reviewer Counterexample IN Spam"},
-
-    # 5. HIGH-CHARGE FRAUD & WANGIRI TRAPS -> SCAM
-    {"case_id": "wangiri_inmarsat_satellite", "raw_number": "+881631555123", "country": "IN", "expected_tier": "SCAM", "expected_is_threat": True, "category": "Wangiri Satellite Trap"},
-    {"case_id": "wangiri_thuraya_satellite", "raw_number": "+882165551234", "country": "IN", "expected_tier": "SCAM", "expected_is_threat": True, "category": "Wangiri Satellite Trap"},
-    {"case_id": "premium_rate_scam_us", "raw_number": "+19005551212", "country": "US", "expected_tier": "SCAM", "expected_is_threat": True, "category": "NANPA Premium Rate Fraud"},
-    {"case_id": "counterexample_gb_high_scam", "raw_number": "+448453722722", "country": "GB", "expected_tier": "SCAM", "expected_is_threat": True, "category": "Reviewer Counterexample GB Scam"},
-
-    # 6. SYNTAX & STRUCTURE VIOLATIONS -> INVALID
-    {"case_id": "invalid_all_zeros", "raw_number": "00000", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Syntax"},
-    {"case_id": "invalid_too_short", "raw_number": "123", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Length Below Minimum"},
-    {"case_id": "invalid_malformed_somalia_fragment", "raw_number": "+2521", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"},
-    {"case_id": "invalid_malformed_guinea_fragment", "raw_number": "+2241", "country": "GN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"},
-    {"case_id": "invalid_malformed_tanzania_fragment", "raw_number": "+2551", "country": "TZ", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"},
-    {"case_id": "invalid_malformed_burundi_fragment", "raw_number": "+2571", "country": "BI", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"},
-    {"case_id": "invalid_malformed_comoros_fragment", "raw_number": "+2691", "country": "KM", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"}
-]
+FIXTURES_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../evaluation/fixtures/canonical_semantic_expectations.json"))
 
 def export_all():
     print("="*85)
@@ -170,9 +118,17 @@ def export_all():
         json.dump(model_export_dict, f, indent=2)
     print(f"[2/3] Exported phonenumber_risk_model.json (150 trees, SHA-256: {tree_sha256[:12]}...)")
 
-    # 3. Export Machine-Readable Golden Test Vectors with Reference Python Outputs
+    # 3. Load Independent Canonical Semantic Fixture and Assert Non-Circular Compliance
+    if not os.path.exists(FIXTURES_PATH):
+        raise FileNotFoundError(f"Independent semantic fixture missing at {FIXTURES_PATH}")
+
+    with open(FIXTURES_PATH, "r", encoding="utf-8-sig") as f:
+        fixtures_data = json.load(f)
+
+    canonical_cases = fixtures_data["canonical_cases"]
     enriched_vectors = []
-    for case in INDEPENDENT_GOLDEN_VECTORS:
+
+    for case in canonical_cases:
         raw_num = case["raw_number"]
         country = case["country"]
         e164, cc, nat, std_len, is_v = normalize_and_parse(raw_num, country)
@@ -186,8 +142,6 @@ def export_all():
             pred_threat = False
             is_abstain = False
             is_invalid = True
-            reason_codes = ["num_is_valid_e164"]
-            explanations = ["Invalid number syntax violating standard numbering plan"]
         else:
             v_py = extract_features_from_number(raw_num, country)
             feats = [round(float(x), 6) for x in v_py]
@@ -213,28 +167,37 @@ def export_all():
                 is_abstain = False
 
             is_invalid = False
-            reason_codes = []
-            explanations = []
-            if v_py[20] > 0.5 or v_py[28] > 0.5:
-                reason_codes.append("risk_wangiri_high_cost_prefix")
-                explanations.append("High-risk international revenue-sharing callback trap (Wangiri scam)")
-            if v_py[21] > 0.5:
-                reason_codes.append("risk_telemarketing_series")
-                explanations.append("Commercial telemarketing or automated dialer series")
-            if v_py[24] > 0.5:
-                reason_codes.append("hard_neg_legitimate_bank_support")
-                explanations.append("Verified legitimate banking customer support or toll-free service")
 
-        # NON-CIRCULAR ASSERTION: Model under test MUST strictly match independently authored expectation
+        # STRICT NON-CIRCULAR ASSERTIONS: Model predictions MUST agree with independently authored expectations
         if pred_tier != case["expected_tier"]:
             raise ValueError(
-                f"CRITICAL SEMANTIC REGRESSION: Case '{case['case_id']}' predicted '{pred_tier}', "
-                f"but independently authored expected tier is '{case['expected_tier']}'!"
+                f"FATAL SEMANTIC REGRESSION: Case '{case['case_id']}' predicted '{pred_tier}', "
+                f"but independently authored expectation is '{case['expected_tier']}'!"
             )
         if pred_threat != case["expected_is_threat"]:
             raise ValueError(
-                f"CRITICAL SEMANTIC REGRESSION: Case '{case['case_id']}' predicted threat={pred_threat}, "
-                f"but independently authored expected threat={case['expected_is_threat']}!"
+                f"FATAL SEMANTIC REGRESSION: Case '{case['case_id']}' predicted isThreat={pred_threat}, "
+                f"but independently authored expectation is isThreat={case['expected_is_threat']}!"
+            )
+        if is_v != case["expected_is_valid"]:
+            raise ValueError(
+                f"FATAL NORMALIZATION REGRESSION: Case '{case['case_id']}' isValid={is_v}, "
+                f"expected={case['expected_is_valid']}!"
+            )
+        if is_abstain != case["expected_is_abstain"]:
+            raise ValueError(
+                f"FATAL ABSTENTION REGRESSION: Case '{case['case_id']}' isAbstain={is_abstain}, "
+                f"expected={case['expected_is_abstain']}!"
+            )
+        if is_invalid != case["expected_is_invalid"]:
+            raise ValueError(
+                f"FATAL INVALID STATE REGRESSION: Case '{case['case_id']}' isInvalid={is_invalid}, "
+                f"expected={case['expected_is_invalid']}!"
+            )
+        if e164 != case["expected_normalized_e164"]:
+            raise ValueError(
+                f"FATAL E.164 REGRESSION: Case '{case['case_id']}' normalized to '{e164}', "
+                f"expected '{case['expected_normalized_e164']}'!"
             )
 
         enriched_vectors.append({
@@ -242,23 +205,25 @@ def export_all():
             "raw_number": raw_num,
             "country": country,
             "category": case["category"],
-            "normalized_e164": e164,
+            "provenance": case["provenance"],
+            "expected_normalized_e164": case["expected_normalized_e164"],
             "expected_tier": case["expected_tier"],
             "expected_is_threat": case["expected_is_threat"],
-            "expected_is_valid": is_v,
-            "expected_is_abstain": is_abstain,
-            "expected_is_invalid": is_invalid,
+            "expected_is_valid": case["expected_is_valid"],
+            "expected_is_abstain": case["expected_is_abstain"],
+            "expected_is_invalid": case["expected_is_invalid"],
             "reference_raw_logit": round(raw_l, 6),
             "reference_calibrated_probability": round(prob, 6),
             "reference_score": score,
             "reference_features": feats,
-            "expected_reason_codes": reason_codes,
-            "expected_explanations": explanations
+            "expected_reason_codes": case.get("expected_reason_codes", []),
+            "expected_explanations": case.get("expected_explanations", [])
         })
 
     golden_suite = {
         "version": "2.1.0",
         "description": f"{len(enriched_vectors)} Canonical Golden Test Vectors with Reference Python Outputs",
+        "fixture_provenance": "ml/evaluation/fixtures/canonical_semantic_expectations.json",
         "operating_thresholds": {
             "legitimate_upper": 0.10,
             "unknown_upper": 0.60,
@@ -269,7 +234,7 @@ def export_all():
     }
     with open(os.path.join(EXPORT_DIR, "golden_test_vectors.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(golden_suite, f, indent=2)
-    print(f"[3/3] Exported golden_test_vectors.json ({len(enriched_vectors)} canonical test cases)")
+    print(f"[3/3] Exported golden_test_vectors.json ({len(enriched_vectors)} canonical test cases asserted non-circularly)")
 
     # 4. Copy to Android assets
     os.makedirs(ANDROID_ASSETS_DIR, exist_ok=True)

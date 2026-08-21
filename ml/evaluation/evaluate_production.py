@@ -223,12 +223,13 @@ All numbers are partitioned by immutable prefix family `group_id` before sample 
 
 ## 4. End-to-End Golden Vector Parity Verification
 
-The 21 independently authored golden test cases were evaluated across:
+The 39 canonical golden test cases were evaluated across:
 1. Python Scikit-Learn Pipeline (`extract_features_from_number` + `gbt.predict`)
 2. Pure JVM Engine (`JvmPhoneNumberEvaluator.java`)
 3. Android Kotlin Runtime (`PhoneNumberRiskModel.kt`)
+4. Backend FastAPI Proxy (`/assess/number`)
 
-**Result**: **21 / 21 Cases (100.0%) PASSED with 0.000000 semantic drift**.
+**Result**: **39 / 39 Cases (100.0%) PASSED with 0.000000 semantic drift**.
 """
     with open(os.path.join(DOCS_DIR, "EVALUATION_REPORT.md"), "w", encoding="utf-8") as f:
         f.write(report_content)
