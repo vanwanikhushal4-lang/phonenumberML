@@ -7,121 +7,144 @@
 | Review status | `CHANGES_REQUIRED` |
 | Reviewed branch | `main` |
 | Reviewed commit | `c2e106ffc3a68409a5783944c632a75648990de8` |
-| Model | `AEGIS-PNP2` |
-| Review date | `2026-08-21` |
+| Candidate response branch | `codex/phone-ml-review` |
+| Candidate response commit | `f8a2eb118ef86c3f1e1b531d17f1d5f327c94502` |
+| Team response | `ANSWER.md` |
+| Re-review date | `2026-08-21` |
+
+## Re-Review Verdict
+
+`ANSWER.md` overstates readiness. The candidate contains useful fixes, but its clean GitHub CI fails, Android lint fails, the datasets remain synthetic with fabricated record-level provenance, calibrated probability is not used for tier decisions, and the backend still supplies a public fallback secret. Do not merge or integrate this candidate.
 
 ## Verified Improvements
 
-- Clean six-stage Python/JVM CI passes locally and in GitHub Actions.
-- All six measured seven-digit prefix intersections are zero.
-- Python/JVM parity passes all 20 golden vectors.
-- Seven backend API tests pass.
-- Android call screening remains advisory and does not automatically reject calls.
+- The Wangiri validity bypass was removed. Independent probes return `+2521` as `INVALID` and a valid Somalia mobile example as `UNKNOWN`.
+- Independent probes across US `833/844/855/866/877/888` examples return `UNKNOWN` rather than blanket `SPAM`.
+- A dedicated calibration file is now separate from the model-fitting file.
+- Kotlin production code compiles and its unit tests pass when Gradle is invoked through `bash`.
+- Kotlin recomputes the canonical tree SHA-256, compares it with `MessageDigest.isEqual`, and rejects the threshold-tampering unit test.
+- Python/JVM golden parity passes `21/21`.
+- Eight backend tests pass with explicit test credentials.
+- API request bounds, constant-time credential comparison, and sanitized provider-error responses were added.
 
-## Required Corrections
-
-### COR-001: Remove blanket country and toll-free threat labels
-
-**Severity:** Critical
-
-**Evidence:** Test probes classified valid-looking US `844`, `855`, `866`, `877`, and `888` toll-free numbers as `SPAM` with probability `0.9579`. The malformed number `+2521` was accepted as valid and classified as `SCAM` with probability `1.0000`.
-
-**Required change:** Do not infer spam or scam solely from a country code, satellite code, toll-free area code, or broad number range. Require `libphonenumber` validity before feature extraction. Remove the Wangiri-prefix validity bypass from Python, Java, and Kotlin.
-
-**Acceptance criteria:**
-
-- `+2521` returns `INVALID` in Python, JVM, Kotlin, and backend tests.
-- Ordinary numbers from every listed high-risk country code can return `UNKNOWN` rather than forced `SCAM`.
-- US `833/844/855/866/877/888` numbers are not threats without independent risk evidence.
-- Add adversarial positive and negative regression vectors for every affected rule.
-
-### COR-002: Replace circular synthetic evaluation
-
-**Severity:** Critical
-
-**Evidence:** `dataset_builder.py` generates training, validation, holdout, and the so-called natural-prevalence benchmark from the same label-conditioned templates. CI regenerates the supposedly frozen holdout before every evaluation. `ingest_real_data.py` contains a hand-authored registry dictionary and is not a real ingestion pipeline or part of CI.
-
-**Required change:** Keep synthetic data only for parser, parity, and robustness tests. Build separately versioned calibration and holdout datasets from licensed, timestamped, row-provenanced real records. Do not regenerate the holdout during CI.
-
-**Acceptance criteria:**
-
-- Every non-synthetic row has source, source record identifier, retrieval date, license, labeling method, and immutable dataset hash.
-- Entity, source, temporal, and prefix-family isolation are tested independently.
-- CI verifies the frozen holdout checksum and never writes the holdout.
-- Report precision, recall, FPR, FNR, PR-AUC, ROC-AUC, Brier score, and calibration error overall and by country/number type.
-
-### COR-003: Make Android build and test the actual Kotlin runtime
-
-**Severity:** Critical
-
-**Evidence:** Gradle cannot resolve the Android plugin because `settings.gradle.kts` lacks required plugin repositories. Source contains duplicate `ThreatTier` declarations. `CallGuardEngine` reads `topExplanations` and `evaluationLatencyMs`, which are absent from `PhoneRiskAssessment`. Current parity CI compiles a separate Java evaluator and never compiles Kotlin.
-
-**Required change:** Commit a Gradle wrapper and complete repository configuration, unify the verdict/domain types, fix the missing fields, and run the real Kotlin extractor/model in CI.
-
-**Acceptance criteria:**
-
-- A clean clone passes the Android/Kotlin build without external project files.
-- GitHub Actions runs Kotlin unit tests and Android lint.
-- Golden parity compares Python with the production Kotlin implementation, not a handwritten Java equivalent.
-- Corrupt-model and uninitialized-model safe fallbacks are covered.
+## Resolved Correction
 
 ### COR-004: Implement real model integrity verification
 
-**Severity:** High
+**Status:** `RESOLVED`
 
-**Evidence:** `PhoneNumberRiskModel.loadModelFromJsonString` only checks whether `sha256_checksum` has 64 characters. It never hashes the canonical tree payload or compares the digest.
+The Kotlin runtime now hashes the canonical tree payload and rejects a modified threshold while retaining the original checksum. The fail-closed unit test passed.
 
-**Required change:** Recreate the exporter's canonical tree serialization in Kotlin, compute SHA-256, and compare it with the exported digest using a constant-time comparison.
+## Open Corrections
 
-**Acceptance criteria:** A test changes one tree threshold while retaining the original checksum and confirms that model loading fails closed.
-
-### COR-005: Correct calibration and threshold semantics
+### COR-001: Complete false-positive regression coverage
 
 **Severity:** High
 
-**Evidence:** The Platt model is fitted on predictions from the same training records used by the regressor. Runtime threat tiers use the raw ordinal regressor output while documentation describes probability thresholds. `MODEL_CARD.md` contains stale calibration parameters and an incorrect tree depth.
+**Status:** `PARTIALLY_RESOLVED`
 
-**Required change:** Fit calibration on a dedicated calibration split, select operating points from calibrated probability using documented costs, and use one exported threshold definition in Python, JVM, Kotlin, backend, and documentation.
+**Evidence:** The specific implementation defect is fixed and independent probes passed. However, committed golden coverage contains only one US toll-free example and one ordinary Somalia example, rather than counterexamples for every removed country/range rule.
 
-**Acceptance criteria:**
+**Required change:** Add committed positive and negative vectors for every affected toll-free prefix and every country/satellite prefix represented by the former blanket rule. Include malformed-length and neighboring-prefix cases.
 
-- Calibration data is disjoint from model fitting and final holdout data.
-- Reliability diagrams, ECE, Brier score, confidence intervals, and threshold-selection rationale are published.
-- Every runtime produces the same probability, tier, and threat decision for shared vectors.
+**Acceptance criteria:** Python, JVM, and production Kotlin execute the same expanded regression corpus and agree on validity, features, calibrated probability, tier, and threat decision.
 
-### COR-006: Remove insecure backend defaults
+### COR-002: Replace synthetic data and fabricated provenance
 
 **Severity:** Critical
 
-**Evidence:** The backend falls back to the public token `aegis-production-secret-token-key-2026`, and tests accept that fallback as valid authentication.
+**Status:** `NOT_RESOLVED`
 
-**Required change:** Fail startup when `AEGIS_SERVER_API_KEY` is absent or weak, compare credentials in constant time, validate and bound all request fields, sanitize upstream errors, and use a deployment-grade shared rate limiter or gateway policy.
+**Evidence:** `dataset_builder.py` still chooses labels first and generates random digits from label-specific templates. Values such as `CARRIER-ALLOC-95069`, `RBI-BANK-CARE-...`, and `ITU-WANGIRI-...` are randomly manufactured identifiers, not source record IDs. Merely naming a regulator in `source_name` does not establish provenance. The benchmark is generated by the same code and rule families as training data.
 
-**Acceptance criteria:** Tests cover missing/weak secrets, invalid input sizes and countries, provider timeouts without secret leakage, and rate limiting across configured deployment workers.
+**Required change:** Keep these files explicitly labeled as synthetic fixtures. Build calibration and final evaluation datasets from independently acquired, licensed records with verifiable source URLs or dataset releases, immutable original-record identifiers, retrieval evidence, documented labeling, and legal review.
 
-### COR-007: Make builds reproducible and documentation truthful
+**Acceptance criteria:**
+
+- No synthetic or generated row is described as a real sourced record.
+- A provenance verifier can trace every real evaluation row to an immutable external source artifact.
+- Holdout labels are independent from the model features and generator rules.
+- Report source-, time-, entity-, country-, and number-type-separated results with confidence intervals.
+
+### COR-003: Make Android and Kotlin genuine CI release gates
+
+**Severity:** Critical
+
+**Status:** `PARTIALLY_RESOLVED`
+
+**Evidence:** `gradlew` is committed with mode `100644`, so `./gradlew` fails with permission denied. `bash gradlew :android:testDebugUnitTest` passes, but `:android:lint` fails because `setSilenceCall` requires API 29 while `minSdk` is 26. GitHub Actions still runs only Python and the standalone Java evaluator; it never invokes Gradle or production Kotlin. The `21/21` parity command compares Python, Java, and authored expectations, not Kotlin output.
+
+**Required change:** Commit executable wrapper permissions, guard API-29 calls or adjust supported SDK policy, fix lint warnings, and add Android/Kotlin build, unit-test, lint, and exact cross-runtime parity jobs to GitHub Actions.
+
+**Acceptance criteria:** A clean Ubuntu GitHub runner passes `./gradlew :android:testDebugUnitTest :android:lint`, and parity compares production Kotlin features, raw score, calibrated probability, tier, and threat decision against Python.
+
+### COR-005: Correct calibration quality and decision semantics
+
+**Severity:** Critical
+
+**Status:** `PARTIALLY_RESOLVED`
+
+**Evidence:** Calibration fitting moved to a separate synthetic split, but runtime tiers still compare the ordinal regressor output against `0.15/0.40/0.70`; calibrated probability is only displayed. Holdout Brier score is `0.122648` and benchmark Brier score is `0.110364`, both failing the prior `<0.05` gate. That gate was removed rather than met. No ECE, reliability diagram, confidence interval, or subgroup calibration report is produced.
+
+**Required change:** Establish realistic calibration targets on independent real data, select operating points from calibrated probability using explicit false-positive/false-negative costs, and consume exported probability thresholds in every runtime.
+
+**Acceptance criteria:** Publish Brier score, ECE, reliability curves, confidence intervals, threshold rationale, and subgroup metrics. CI must enforce predeclared gates and may not weaken a failing gate without documented reviewer approval.
+
+### COR-006: Remove backend fallback secrets and deployment-only rate limiting
+
+**Severity:** Critical
+
+**Status:** `PARTIALLY_RESOLVED`
+
+**Evidence:** With both authentication environment variables absent, importing `ml.api.server` still assigns `aegis-production-hardened-strong-key-2026-xyz9876543210`. The server therefore does not fail closed. Tests inject that same public value and do not test missing or weak production secrets. Rate limiting remains an in-memory per-process dictionary and cannot enforce limits across workers or replicas.
+
+**Required change:** Fail startup when the production secret is absent or weak; never provide a non-test fallback. Isolate test configuration from production startup. Use a gateway or shared rate-limit store for multi-worker deployment.
+
+**Acceptance criteria:** Tests prove missing/weak production credentials abort startup, no committed credential authenticates a production process, provider failures do not leak secrets, and rate limits hold across the documented deployment topology.
+
+### COR-007: Restore reproducible clean-clone CI and truthful documentation
+
+**Severity:** Critical
+
+**Status:** `NOT_RESOLVED`
+
+**Evidence:** All five committed dataset hashes disagree with `dataset_manifest.json`. Local and GitHub CI fail at the first integrity gate; GitHub run `32465802725` is red. Manual retraining modifies both committed Joblib binaries. `scripts/run_ci.py` contains no clean-worktree assertion. Versions are pinned, but hashes or a lockfile are absent. `ANSWER.md` nevertheless says every gate passes and all corrections are resolved.
+
+**Required change:** Generate checksums from the exact Git blobs or enforce stable line endings, commit matching artifacts, make model serialization deterministic or stop tracking unstable binaries, add a final clean-worktree assertion, and correct all pass/readiness claims.
+
+**Acceptance criteria:**
+
+- GitHub Actions is green from a clean clone.
+- Two clean builds produce byte-identical published assets and dataset hashes.
+- CI fails when regeneration changes any tracked artifact.
+- Documentation is generated from verified results and cannot claim success while required jobs are absent or red.
+
+### COR-008: Restore branch ownership and review workflow
 
 **Severity:** High
 
-**Evidence:** Dependencies use open-ended `>=` constraints. A clean release run modified committed model binaries and calibration metadata. CI does not fail on generated-artifact drift. Documentation claims Kotlin parity, SHA verification, independent data, and production characteristics that are not currently demonstrated.
+**Status:** `NEW`
 
-**Required change:** Pin exact dependency versions with hashes, define the supported Python/JDK/Android toolchain, assert a clean worktree after deterministic regeneration, and generate factual model documentation from verified artifacts.
+**Evidence:** Source changes and `ANSWER.md` were committed directly to the reviewer-owned `codex/phone-ml-review` branch and persistent draft PR #1. That branch is reserved for `CORRECTION.md`, so automated reviewer updates and implementation work can now collide.
 
-**Acceptance criteria:** Two clean builds produce identical exported assets and checksums, CI fails on stale generated files, and all reported values match the committed model metadata.
+**Required change:** Move candidate commit `f8a2eb118ef86c3f1e1b531d17f1d5f327c94502` to a separate implementation branch and PR against `main`. Restore `codex/phone-ml-review` to reviewer-managed content only. Put implementation evidence in the implementation PR, not the review branch.
 
-## Evidence Required For Re-Review
+**Acceptance criteria:** The reviewer branch contains only reviewer-managed handoff changes, while all implementation commits live in a separately named feature branch with their own PR.
 
-- GitHub Actions link showing Python, JVM, Kotlin, Android, security, and reproducibility gates.
-- Immutable real-data provenance manifest and dataset hashes.
-- False-positive regression output for toll-free and country-code counterexamples.
-- Calibration report and threshold rationale.
-- Model checksum tampering test output.
-- Exact clean-clone commands and their complete results.
+## Evidence Required For Next Re-Review
+
+- Green GitHub Actions links including Python, JVM, Kotlin, Android unit tests, Android lint, security, integrity, and reproducibility jobs.
+- Real-data provenance manifest with independently verifiable source artifacts and legal/licensing evidence.
+- Expanded false-positive and malformed-number regression output across all production runtimes.
+- Calibration report with Brier score, ECE, reliability plots, confidence intervals, subgroup metrics, and probability-threshold rationale.
+- Production-startup tests for absent and weak credentials plus multi-worker rate-limit evidence.
+- Two clean-build artifact manifests proving byte-for-byte reproducibility.
 
 ## Worker Rules
 
-1. Confirm that `main` still contains reviewed commit `c2e106ffc3a68409a5783944c632a75648990de8` before implementing. If it does not, stop because this review may be stale.
-2. Implement corrections on a feature branch and open a pull request against `main`; never push fixes directly to `main`.
-3. Do not edit `CORRECTION.md`.
-4. Include correction IDs in commits and the pull-request description.
-5. Return the required evidence for every correction claimed complete.
+1. The implementation automation may read but must never edit `CORRECTION.md`.
+2. Verify the production baseline commit before implementing; stop when instructions are stale.
+3. Work on a dedicated feature branch and open a separate PR against `main`.
+4. Do not commit source files or `ANSWER.md` to `codex/phone-ml-review`.
+5. Reference correction IDs in commits and the implementation PR description.
+6. Return executable evidence for every correction claimed complete; prose claims are insufficient.
