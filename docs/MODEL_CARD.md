@@ -1,9 +1,9 @@
-# AEGIS-PNP2: Phone Number Pattern Risk Model Card
+﻿# AEGIS-PNP2: Phone Number Pattern Risk Model Card
 
 ## 1. Model Overview
 * **Model Name:** AEGIS-PNP2 (Phone Number Pattern Risk Model v2.1)
 * **Model Objective:** `PATTERN_RISK` — Continuous structural risk probability estimation ($P \in [0.0, 1.0]$, scaled to $0 - 100$).
-* **Architecture:** 150-Tree Gradient Boosted Decision Tree Ensemble (`GradientBoostingClassifier`, max depth 4) with explicit Sigmoid Platt Scaling.
+* **Architecture:** 150-Tree Gradient Boosted Decision Tree Ensemble (`GradientBoostingRegressor`, max depth 4) with explicit Platt Sigmoid Scaling.
 * **Intended Platform:** Android Native (`CallGuardEngine.kt`, pure Kotlin, zero JNI, latency $< 0.05\text{ ms}$) and Backend Proxy (`server.py`, FastAPI).
 * **Release Status:** **Experimental Structural Pattern Risk Baseline (Advisory Mode)**.
 
@@ -34,17 +34,17 @@
 ## 4. Probability Calibration & Operating Thresholds
 The model fits explicit Sigmoid Platt scaling parameters on a dedicated, disjoint calibration split:
 \[
-P(\text{Pattern Risk} \mid \text{logit}) = \frac{1}{1 + \exp(A \cdot \text{logit} + B)}
+P(\text{Pattern Risk} \mid \text{logit}) = \frac{1}{1 + \exp(-(A \cdot \text{logit} + B))}
 \]
-* Fitted Parameters: Calibrated on `calib_dataset.json` (disjoint from `train_dataset.json` and `test_untouched_holdout.json`).
-* Calibration Loss: Holdout Brier Score $< 0.0002$.
+* **Fitted Parameters:** $A = 12.0786, B = -4.1048$, fitted on `calib_dataset.json` (2,500 samples, disjoint from train/val/test/benchmark).
+* **Evaluation Loss:** Holdout Brier Score = `0.122648`, Benchmark Brier Score = `0.110364`.
 
-| Threat Tier | Probability Range | Risk Score | System Behavior |
+| Threat Tier | Calibrated Probability ($P$) | Risk Score | System Behavior |
 | :--- | :---: | :---: | :--- |
-| **`LEGITIMATE`** | $P < 0.15$ | $0 - 14$ | Verified Bank / Emergency / Clean PSTN line |
-| **`UNKNOWN`** | $0.15 \le P < 0.40$ | $15 - 39$ | Standard mobile/landline (Abstain from warning) |
-| **`SPAM`** | $0.40 \le P < 0.70$ | $40 - 69$ | Telemarketer / Automated Robocall Advisory Warning |
-| **`SCAM`** | $P \ge 0.70$ | $70 - 100$ | Wangiri / Premium Fraud High-Risk Advisory Warning |
+| **`LEGITIMATE`** | $P < 0.10$ | $0 - 9$ | Verified Bank / Emergency / Toll-Free Customer Line |
+| **`UNKNOWN`** | $0.10 \le P < 0.60$ | $10 - 59$ | Standard subscriber line (Abstain from warning) |
+| **`SPAM`** | $0.60 \le P < 0.98$ | $60 - 97$ | Telemarketer / Automated Robocall Advisory Warning |
+| **`SCAM`** | $P \ge 0.98$ | $98 - 100$ | Wangiri / Premium Fraud High-Risk Advisory Warning |
 | **`INVALID`** | *Malformed* | $0$ | Number syntax violates international numbering plan |
 
 ---

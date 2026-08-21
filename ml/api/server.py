@@ -168,17 +168,17 @@ def assess_phone_number(req: PhoneAssessmentRequest):
     cal_prob = float(1.0 / (1.0 + np.exp(-(PARAM_A * raw_logit + PARAM_B))))
     score = int(round(max(0.0, min(1.0, raw_logit)) * 100.0))
 
-    if raw_logit >= 0.70:
+    if cal_prob >= 0.98:
         tier = "SCAM"
         confidence = "HIGH"
         is_threat = True
         is_abstain = False
-    elif raw_logit >= 0.40:
+    elif cal_prob >= 0.60:
         tier = "SPAM"
         confidence = "MEDIUM"
         is_threat = True
         is_abstain = False
-    elif raw_logit >= 0.15:
+    elif cal_prob >= 0.10:
         tier = "UNKNOWN"
         confidence = "LOW"
         is_threat = False

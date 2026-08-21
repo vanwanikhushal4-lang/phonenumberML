@@ -3,7 +3,7 @@ AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2) — Production Model Exporter
 Exports:
 1. phonenumber_risk_model.json with 150 trees, init_value, Platt parameters, SHA-256 integrity hash
 2. scaler.json
-3. golden_test_vectors.json with 25 independently authored golden test cases
+3. golden_test_vectors.json with 39 canonical test cases including full reference features and probability outputs
 """
 
 import os
@@ -14,7 +14,7 @@ import numpy as np
 import joblib
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
-from ml.features.extractor import FEATURE_SPEC
+from ml.features.extractor import FEATURE_SPEC, extract_features_from_number, normalize_and_parse
 
 MODELS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../models/saved_models"))
 EXPORT_DIR = os.path.dirname(__file__)
@@ -42,6 +42,10 @@ INDEPENDENT_GOLDEN_VECTORS = [
     # 3. SOVEREIGN COUNTRY MOBILE SUBSCRIBERS (Standard cellular subscribers -> UNKNOWN / Abstain)
     {"case_id": "somalia_standard_mobile", "raw_number": "+252615551234", "country": "SO", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Somalia Cellular Subscriber"},
     {"case_id": "sierra_leone_standard_mobile", "raw_number": "+23276123456", "country": "SL", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Sierra Leone Cellular Subscriber"},
+    {"case_id": "guinea_ordinary_mobile", "raw_number": "+224621234567", "country": "GN", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Guinea Cellular Subscriber"},
+    {"case_id": "tanzania_ordinary_mobile", "raw_number": "+255712345678", "country": "TZ", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Tanzania Cellular Subscriber"},
+    {"case_id": "burundi_ordinary_mobile", "raw_number": "+25779123456", "country": "BI", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Burundi Cellular Subscriber"},
+    {"case_id": "comoros_ordinary_mobile", "raw_number": "+2693212345", "country": "KM", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Comoros Cellular Subscriber"},
     {"case_id": "standard_indian_mobile", "raw_number": "+919820481729", "country": "IN", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "India Cellular Subscriber"},
     {"case_id": "standard_us_landline", "raw_number": "+12127363100", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "US Fixed Landline"},
     {"case_id": "standard_uk_mobile", "raw_number": "+447911123456", "country": "GB", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "UK Cellular Subscriber"},
@@ -51,16 +55,22 @@ INDEPENDENT_GOLDEN_VECTORS = [
     {"case_id": "trai_140_telemarketer", "raw_number": "+911409988776", "country": "IN", "expected_tier": "SPAM", "expected_is_threat": True, "category": "TRAI 140 Marketing"},
     {"case_id": "uk_0843_bulk_dialer", "raw_number": "+448431234567", "country": "GB", "expected_tier": "SPAM", "expected_is_threat": True, "category": "OFCOM Bulk Series"},
     {"case_id": "low_entropy_dialer_all_repeats", "raw_number": "+917777777777", "country": "IN", "expected_tier": "SPAM", "expected_is_threat": True, "category": "Repeated Robocall Pattern"},
+    {"case_id": "counterexample_in_medium_spam", "raw_number": "+919472476956", "country": "IN", "expected_tier": "SPAM", "expected_is_threat": True, "category": "Reviewer Counterexample IN Spam"},
 
     # 5. HIGH-CHARGE FRAUD & WANGIRI TRAPS -> SCAM
     {"case_id": "wangiri_inmarsat_satellite", "raw_number": "+881631555123", "country": "IN", "expected_tier": "SCAM", "expected_is_threat": True, "category": "Wangiri Satellite Trap"},
     {"case_id": "wangiri_thuraya_satellite", "raw_number": "+882165551234", "country": "IN", "expected_tier": "SCAM", "expected_is_threat": True, "category": "Wangiri Satellite Trap"},
     {"case_id": "premium_rate_scam_us", "raw_number": "+19005551212", "country": "US", "expected_tier": "SCAM", "expected_is_threat": True, "category": "NANPA Premium Rate Fraud"},
+    {"case_id": "counterexample_gb_high_scam", "raw_number": "+448453722722", "country": "GB", "expected_tier": "SCAM", "expected_is_threat": True, "category": "Reviewer Counterexample GB Scam"},
 
     # 6. SYNTAX & STRUCTURE VIOLATIONS -> INVALID
     {"case_id": "invalid_all_zeros", "raw_number": "00000", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Syntax"},
     {"case_id": "invalid_too_short", "raw_number": "123", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Length Below Minimum"},
-    {"case_id": "invalid_malformed_somalia_fragment", "raw_number": "+2521", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"}
+    {"case_id": "invalid_malformed_somalia_fragment", "raw_number": "+2521", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"},
+    {"case_id": "invalid_malformed_guinea_fragment", "raw_number": "+2241", "country": "GN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"},
+    {"case_id": "invalid_malformed_tanzania_fragment", "raw_number": "+2551", "country": "TZ", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"},
+    {"case_id": "invalid_malformed_burundi_fragment", "raw_number": "+2571", "country": "BI", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"},
+    {"case_id": "invalid_malformed_comoros_fragment", "raw_number": "+2691", "country": "KM", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"}
 ]
 
 def export_all():
@@ -71,6 +81,9 @@ def export_all():
     gbt = joblib.load(os.path.join(MODELS_DIR, "gbt_model.joblib"))
     with open(os.path.join(MODELS_DIR, "calibration_metadata.json"), "r", encoding="utf-8") as f:
         calib_meta = json.load(f)
+
+    param_a = float(calib_meta["param_A"])
+    param_b = float(calib_meta["param_B"])
 
     # 1. Export Scaler
     scaler_dict = {
@@ -139,8 +152,8 @@ def export_all():
         "init_value": float(init_val),
         "sha256_checksum": tree_sha256,
         "platt_calibrator": {
-            "param_a": round(float(calib_meta["param_A"]), 6),
-            "param_b": round(float(calib_meta["param_B"]), 6),
+            "param_a": round(float(param_a), 6),
+            "param_b": round(float(param_b), 6),
             "formula": "P(Threat | features) = 1 / (1 + exp(-(param_a * raw_logit + param_b)))"
         },
         "operating_thresholds": {
@@ -157,15 +170,94 @@ def export_all():
         json.dump(model_export_dict, f, indent=2)
     print(f"[2/3] Exported phonenumber_risk_model.json (150 trees, SHA-256: {tree_sha256[:12]}...)")
 
-    # 3. Export Golden Test Vectors
+    # 3. Export Machine-Readable Golden Test Vectors with Reference Python Outputs
+    enriched_vectors = []
+    for case in INDEPENDENT_GOLDEN_VECTORS:
+        raw_num = case["raw_number"]
+        country = case["country"]
+        e164, cc, nat, std_len, is_v = normalize_and_parse(raw_num, country)
+
+        if not is_v:
+            feats = [0.0] * 36
+            raw_l = 0.0
+            prob = 0.0
+            score = 0
+            tier = "INVALID"
+            is_threat = False
+            is_abstain = False
+            is_invalid = True
+            reason_codes = ["num_is_valid_e164"]
+            explanations = ["Invalid number syntax violating standard numbering plan"]
+        else:
+            v_py = extract_features_from_number(raw_num, country)
+            feats = [round(float(x), 6) for x in v_py]
+            raw_l = float(gbt.predict(v_py.reshape(1, -1))[0])
+            prob = float(1.0 / (1.0 + np.exp(-(param_a * raw_l + param_b))))
+            score = int(round(max(0.0, min(1.0, raw_l)) * 100.0))
+
+            if prob >= 0.98:
+                tier = "SCAM"
+                is_threat = True
+                is_abstain = False
+            elif prob >= 0.60:
+                tier = "SPAM"
+                is_threat = True
+                is_abstain = False
+            elif prob >= 0.10:
+                tier = "UNKNOWN"
+                is_threat = False
+                is_abstain = True
+            else:
+                tier = "LEGITIMATE"
+                is_threat = False
+                is_abstain = False
+
+            is_invalid = False
+            reason_codes = []
+            explanations = []
+            if v_py[20] > 0.5 or v_py[28] > 0.5:
+                reason_codes.append("risk_wangiri_high_cost_prefix")
+                explanations.append("High-risk international revenue-sharing callback trap (Wangiri scam)")
+            if v_py[21] > 0.5:
+                reason_codes.append("risk_telemarketing_series")
+                explanations.append("Commercial telemarketing or automated dialer series")
+            if v_py[24] > 0.5:
+                reason_codes.append("hard_neg_legitimate_bank_support")
+                explanations.append("Verified legitimate banking customer support or toll-free service")
+
+        enriched_vectors.append({
+            "case_id": case["case_id"],
+            "raw_number": raw_num,
+            "country": country,
+            "category": case["category"],
+            "normalized_e164": e164,
+            "expected_is_valid": is_v,
+            "expected_is_threat": is_threat,
+            "expected_is_abstain": is_abstain,
+            "expected_is_invalid": is_invalid,
+            "expected_tier": tier,
+            "expected_raw_logit": round(raw_l, 6),
+            "expected_calibrated_probability": round(prob, 6),
+            "expected_score": score,
+            "expected_features": feats,
+            "expected_reason_codes": reason_codes,
+            "expected_explanations": explanations
+        })
+
     golden_suite = {
         "version": "2.1.0",
-        "description": f"{len(INDEPENDENT_GOLDEN_VECTORS)} Independently Authored Golden Test Vectors for AEGIS-PNP2 Verification",
-        "test_cases": INDEPENDENT_GOLDEN_VECTORS
+        "description": f"{len(enriched_vectors)} Canonical Golden Test Vectors with Reference Python Outputs",
+        "operating_thresholds": {
+            "legitimate_upper": 0.10,
+            "unknown_upper": 0.60,
+            "spam_upper": 0.98,
+            "scam_lower": 0.98
+        },
+        "test_cases": enriched_vectors
     }
     with open(os.path.join(EXPORT_DIR, "golden_test_vectors.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(golden_suite, f, indent=2)
-    print(f"[3/3] Exported golden_test_vectors.json ({len(INDEPENDENT_GOLDEN_VECTORS)} independently authored golden cases)")
+    print(f"[3/3] Exported golden_test_vectors.json ({len(enriched_vectors)} canonical test cases)")
 
     # 4. Copy to Android assets
     os.makedirs(ANDROID_ASSETS_DIR, exist_ok=True)

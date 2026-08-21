@@ -1,4 +1,4 @@
-﻿"""
+"""
 Automated Security, Authentication, Input Validation & Rate Limiting Tests for AEGIS Backend Server
 Tests:
 1. Missing Authentication (401 Unauthorized)
@@ -91,6 +91,34 @@ class ApiServerSecurityTests(unittest.TestCase):
         self.assertIn(data["threat_tier"], ["SPAM", "SCAM"])
         self.assertGreaterEqual(data["pattern_risk_score"], 40)
         self.assertIn("risk_telemarketing_series", data["top_reason_codes"])
+
+    def test_assessment_counterexample_gb_high_calibrated_scam(self):
+        # Reviewer counterexample +448453722722 (GB) -> cal_prob >= 0.98 -> SCAM
+        resp = self.client.post(
+            "/assess/number",
+            json={"raw_number": "+448453722722", "default_country": "GB"},
+            headers=self.valid_headers
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["is_valid"])
+        self.assertTrue(data["is_threat"])
+        self.assertEqual(data["threat_tier"], "SCAM")
+        self.assertFalse(data["is_abstain"])
+
+    def test_assessment_counterexample_in_medium_calibrated_spam(self):
+        # Reviewer counterexample +919472476956 (IN) -> cal_prob >= 0.60 -> SPAM
+        resp = self.client.post(
+            "/assess/number",
+            json={"raw_number": "+919472476956", "default_country": "IN"},
+            headers=self.valid_headers
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertTrue(data["is_valid"])
+        self.assertTrue(data["is_threat"])
+        self.assertEqual(data["threat_tier"], "SPAM")
+        self.assertFalse(data["is_abstain"])
 
     def test_assessment_invalid_all_zeros(self):
         resp = self.client.post(

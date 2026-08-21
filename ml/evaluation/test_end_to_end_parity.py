@@ -1,7 +1,7 @@
-"""
+﻿"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2)
 End-to-End Prediction Parity Suite with Independent Golden Vectors
-[Python Model] vs [Pure JVM Engine] vs [Independently Authored Expectations]
+[Python Model] vs [Pure JVM Engine] vs [FastAPI Backend] vs [Canonical Reference Expectations]
 """
 
 import os
@@ -10,9 +10,14 @@ import json
 import subprocess
 import numpy as np
 import joblib
+from fastapi.testclient import TestClient
+
+os.environ["AEGIS_TEST_MODE"] = "1"
+os.environ["AEGIS_SERVER_API_KEY"] = "aegis-test-mode-secure-key-32-chars-long-abcdef"
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from ml.features.extractor import extract_features_from_number, normalize_and_parse
+from ml.api.server import app, AEGIS_SERVER_API_KEY
 
 EVAL_DIR = os.path.dirname(__file__)
 EXPORT_DIR = os.path.abspath(os.path.join(EVAL_DIR, "../export"))
@@ -37,12 +42,14 @@ def run_jvm_eval(raw_number: str, country: str = "IN") -> dict:
     return json.loads(res.stdout.strip())
 
 def verify_end_to_end_parity():
-    print("="*105)
+    print("="*115)
     print("      AEGIS-PNP2 COMPLETE TRAIN / SERVE PARITY & SEMANTIC VERIFICATION SUITE")
-    print("       [Python Scikit-Learn] vs [JVM Tree Engine] vs [Golden Expectations]")
-    print("="*105)
+    print("       [Python Scikit-Learn] vs [JVM Tree Engine] vs [FastAPI Backend] vs [Golden Expectations]")
+    print("="*115)
 
     compile_jvm_evaluator()
+    client = TestClient(app)
+    api_headers = {"X-AEGIS-API-KEY": AEGIS_SERVER_API_KEY}
 
     with open(os.path.join(EXPORT_DIR, "golden_test_vectors.json"), "r", encoding="utf-8-sig") as f:
         golden_data = json.load(f)
@@ -57,8 +64,8 @@ def verify_end_to_end_parity():
     test_cases = golden_data["test_cases"]
     passed_count = 0
 
-    print(f"\n{'Case ID':<28} | {'Py Tier':<10} | {'JVM Tier':<10} | {'Exp Tier':<10} | {'Prob Diff':<10} | {'Feat Diff':<10} | {'Status'}")
-    print("-" * 105)
+    print(f"\n{'Case ID':<30} | {'Py Tier':<10} | {'JVM Tier':<10} | {'API Tier':<10} | {'Exp Tier':<10} | {'Prob Diff':<10} | {'Status'}")
+    print("-" * 115)
 
     for case in test_cases:
         cid = case["case_id"]
@@ -94,23 +101,31 @@ def verify_end_to_end_parity():
         tier_jvm = jvm_res["threatTier"]
         v_jvm = np.array(jvm_res["features"], dtype=np.float32)
 
+        # 3. FastAPI Endpoint
+        api_resp = client.post("/assess/number", json={"raw_number": raw_num, "default_country": country}, headers=api_headers)
+        if api_resp.status_code != 200:
+            raise RuntimeError(f"FastAPI call failed for {raw_num}: {api_resp.text}")
+        api_data = api_resp.json()
+        tier_api = api_data["threat_tier"]
+        prob_api = float(api_data["calibrated_probability"])
+
         feat_diff = float(np.max(np.abs(v_py - v_jvm)))
-        prob_diff = abs(prob_py - prob_jvm)
+        prob_diff = max(abs(prob_py - prob_jvm), abs(prob_py - prob_api))
         logit_diff = abs(raw_l_py - raw_l_jvm)
 
-        norm_match = (e164_py == e164_jvm) and (is_v_py == is_v_jvm)
+        norm_match = (e164_py == e164_jvm == api_data["normalized_e164"]) and (is_v_py == is_v_jvm == api_data["is_valid"])
         feat_match = (feat_diff < 1e-3)
         prob_match = (prob_diff < 1e-3) and (logit_diff < 0.05)
-        tier_match = (tier_py == tier_jvm) and (tier_py == expected_tier)
-        score_match = (abs(score_py - score_jvm) <= 1)
+        tier_match = (tier_py == tier_jvm == tier_api == expected_tier)
+        score_match = (abs(score_py - score_jvm) <= 1) and (abs(score_py - api_data["pattern_risk_score"]) <= 1)
 
         passed = norm_match and feat_match and prob_match and tier_match and score_match
         if passed: passed_count += 1
-        status = "[PARITY OK]" if passed else f"[FAIL - Diff (P:{prob_diff:.4f}, T:{tier_py}/{tier_jvm}/{expected_tier})]"
+        status = "[PARITY OK]" if passed else f"[FAIL - Diff (P:{prob_diff:.4f}, T:{tier_py}/{tier_jvm}/{tier_api}/{expected_tier})]"
 
-        print(f"{cid:<28} | {tier_py:<10} | {tier_jvm:<10} | {expected_tier:<10} | {prob_diff:<10.6f} | {feat_diff:<10.6f} | {status}")
+        print(f"{cid:<30} | {tier_py:<10} | {tier_jvm:<10} | {tier_api:<10} | {expected_tier:<10} | {prob_diff:<10.6f} | {status}")
 
-    print("-" * 105)
+    print("-" * 115)
     print(f"End-to-End Parity & Semantic Result: {passed_count} / {len(test_cases)} PASSED ({passed_count/len(test_cases)*100:.1f}%)")
     return passed_count == len(test_cases)
 

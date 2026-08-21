@@ -4,9 +4,10 @@ Asserts every single release gate from a clean clone:
 1. Frozen Holdout & Benchmark SHA-256 Checksum Verification + 10-Way Isolation Audit
 2. Model Training & Continuous Platt Calibration
 3. Model Export & Checksum Generation (ASSERT: 150 Trees + Canonical SHA-256 Digest)
-4. Complete End-to-End Prediction Parity Suite (ASSERT: 29 / 29 Cases, 0 Drift)
+4. Complete 4-Way Prediction Parity Suite (ASSERT: 39 / 39 Cases, 0 Drift across Py, JVM, API, Reference)
 5. Untouched Holdout Test Set Production Evaluation (ASSERT: ROC-AUC >= 0.85, PR-AUC >= 0.80)
-6. Backend API Security, Authentication & Rate Limiting Tests (ASSERT: 10 / 10 PASSED)
+6. Backend API Security, Authentication & Rate Limiting Tests (ASSERT: 12 / 12 PASSED)
+7. Clean Worktree Verification (ASSERT: Tracked files match Git index)
 """
 
 import os
@@ -54,6 +55,16 @@ def verify_dataset_integrity():
 
     print("[+] All frozen holdout & benchmark datasets verified with 100% cryptographic integrity.")
 
+def verify_clean_worktree():
+    print("\n" + "="*90)
+    print("[*] RUNNING CI STEP: Clean Worktree Verification")
+    print("="*90)
+    res = subprocess.run(["git", "diff", "--exit-code", "ml/export/", "ml/models/saved_models/calibration_metadata.json"], cwd=ROOT_DIR)
+    if res.returncode != 0:
+        print("[!] RELEASE GATE FAILURE: Exported release artifacts drift detected after build!")
+        sys.exit(res.returncode)
+    print("[+] Verified clean worktree on release artifacts (0.0% Artifact Drift).")
+
 def main():
     print("="*90)
     print("      AEGIS-PNP2 CONTINUOUS INTEGRATION & RELEASE GATE SUITE")
@@ -68,14 +79,17 @@ def main():
     # 3. Model Export & Checksum Generation
     run_step("3/6 Model Export & Checksum Generation", [PYTHON, "ml/export/exporter.py"])
 
-    # 4. End-to-End Train/Serve Parity Suite (Python Scikit-Learn vs Pure JVM vs 29 Golden Vectors)
-    run_step("4/6 End-to-End Prediction Parity (Python vs JVM vs Golden 29 Vectors)", [PYTHON, "ml/evaluation/test_end_to_end_parity.py"])
+    # 4. End-to-End Train/Serve Parity Suite (Python vs JVM vs FastAPI vs Golden 39 Vectors)
+    run_step("4/6 End-to-End Prediction Parity (Python vs JVM vs FastAPI vs Golden 39 Vectors)", [PYTHON, "ml/evaluation/test_end_to_end_parity.py"])
 
     # 5. Production Holdout Evaluation & Benchmark Report
     run_step("5/6 Production Holdout Evaluation & Benchmark Report", [PYTHON, "ml/evaluation/evaluate_production.py"])
 
     # 6. Backend API Security, Authentication & Rate Limiting Tests
     run_step("6/6 Backend API Security, Authentication & Rate Limiting Tests", [PYTHON, "-m", "unittest", "ml/api/test_server.py"])
+
+    # 7. Clean Worktree Verification
+    verify_clean_worktree()
 
     print("\n" + "="*90)
     print("      ALL AEGIS-PNP2 CI RELEASE GATES PASSED (100.0% SUCCESS)")

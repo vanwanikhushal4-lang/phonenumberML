@@ -1,14 +1,16 @@
-package com.aegis.guard.phonenumber
+﻿package com.aegis.guard.phonenumber
 
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import java.io.File
+import kotlin.math.abs
 
 /**
- * Unit & Regression Test Suite for AEGIS-PNP2 Android Kotlin Runtime.
- * Loads committed phonenumber_risk_model.json asset and asserts all 20 independent golden test cases.
+ * Unit & Cross-Runtime Parity Test Suite for AEGIS-PNP2 Android Kotlin Runtime.
+ * Loads committed phonenumber_risk_model.json asset and asserts all 39 canonical golden test cases
+ * against reference Python feature extractions, raw logits, calibrated probabilities, and tier decisions.
  */
 class PhoneNumberRiskModelTest {
 
@@ -32,7 +34,7 @@ class PhoneNumberRiskModelTest {
     }
 
     @Test
-    fun testAll29GoldenVectorsMatchExactExpectedOutcomes() {
+    fun testAll39GoldenVectorsMatchReferenceOutputs() {
         val goldenCandidates = listOf(
             File("ml/export/golden_test_vectors.json"),
             File("../../ml/export/golden_test_vectors.json"),
@@ -43,7 +45,9 @@ class PhoneNumberRiskModelTest {
 
         val goldenJson = JSONObject(goldenFile!!.readText())
         val testCases = goldenJson.getJSONArray("test_cases")
-        assertEquals(29, testCases.length())
+        assertEquals(39, testCases.length())
+
+        val extractor = PhoneNumberFeatureExtractor()
 
         for (i in 0 until testCases.length()) {
             val caseObj = testCases.getJSONObject(i)
@@ -52,17 +56,45 @@ class PhoneNumberRiskModelTest {
             val country = caseObj.getString("country")
             val expTier = caseObj.getString("expected_tier")
             val expIsThreat = caseObj.getBoolean("expected_is_threat")
+            val expIsValid = caseObj.getBoolean("expected_is_valid")
+            val expIsAbstain = caseObj.getBoolean("expected_is_abstain")
+            val expIsInvalid = caseObj.getBoolean("expected_is_invalid")
+            val expRawLogit = caseObj.getDouble("expected_raw_logit")
+            val expCalProb = caseObj.getDouble("expected_calibrated_probability")
+            val expScore = caseObj.getInt("expected_score")
+            val expFeats = caseObj.getJSONArray("expected_features")
 
             val assessment = riskModel.assessNumber(rawNum, country)
 
+            assertEquals("Case $caseId isValid mismatch", expIsValid, assessment.isValid)
+            assertEquals("Case $caseId isInvalid mismatch", expIsInvalid, assessment.isInvalid)
             assertEquals("Case $caseId tier mismatch", expTier, assessment.threatTier.name)
             assertEquals("Case $caseId isThreat mismatch", expIsThreat, assessment.isThreat)
-            if (expTier == "INVALID") {
-                assertTrue("Case $caseId should be invalid", assessment.isInvalid)
-                assertFalse("Case $caseId should not be valid", assessment.isValid)
-            } else {
-                assertFalse("Case $caseId should not be invalid", assessment.isInvalid)
-                assertTrue("Case $caseId should be valid", assessment.isValid)
+            assertEquals("Case $caseId isAbstain mismatch", expIsAbstain, assessment.isAbstain)
+
+            if (expIsValid) {
+                // Verify Feature Parity (all 36 features within 1e-4 tolerance)
+                val ktFeats = extractor.extractFeatures(rawNum, country)
+                assertEquals("Case $caseId feature count mismatch", 36, ktFeats.size)
+                for (fIdx in 0 until 36) {
+                    val expVal = expFeats.getDouble(fIdx)
+                    val actVal = ktFeats[fIdx]
+                    assertTrue(
+                        "Case $caseId feat[$fIdx] mismatch: exp=$expVal, act=$actVal",
+                        abs(expVal - actVal) < 1e-4
+                    )
+                }
+
+                // Verify Numeric Prediction Parity (within 1e-4 tolerance)
+                assertTrue(
+                    "Case $caseId rawLogit mismatch: exp=$expRawLogit, act=${assessment.rawLogit}",
+                    abs(expRawLogit - assessment.rawLogit) < 1e-4
+                )
+                assertTrue(
+                    "Case $caseId calProb mismatch: exp=$expCalProb, act=${assessment.calibratedProbability}",
+                    abs(expCalProb - assessment.calibratedProbability) < 1e-4
+                )
+                assertEquals("Case $caseId score mismatch", expScore, assessment.riskScore)
             }
         }
     }
@@ -102,19 +134,27 @@ class PhoneNumberRiskModelTest {
         )
         val modelFile = candidates.find { it.exists() }
         assertNotNull("phonenumber_risk_model.json asset must exist", modelFile)
-        val validJsonStr = modelFile!!.readText()
+        val originalJsonStr = modelFile!!.readText()
 
-        // Tamper a single threshold in the JSON while retaining original sha256_checksum
-        val tamperedJsonStr = validJsonStr.replaceFirst("\"threshold\": 0.", "\"threshold\": 0.99999999")
-        assertNotEquals("JSON must be modified for tampering test", validJsonStr, tamperedJsonStr)
+        val json = JSONObject(originalJsonStr)
+        val originalChecksum = json.getString("sha256_checksum")
 
-        val tamperModel = PhoneNumberRiskModel()
-        val loaded = tamperModel.loadModelFromJsonString(tamperedJsonStr)
-        assertFalse("Tampered tree thresholds must fail SHA-256 integrity verification and fail closed", loaded)
+        val treesArray = json.getJSONArray("trees")
+        val firstTree = treesArray.getJSONObject(0)
+        val nodesArray = firstTree.getJSONArray("nodes")
+        val rootNode = nodesArray.getJSONObject(0)
 
-        // Verify fail-closed behavior on evaluation
-        val assessment = tamperModel.assessNumber("+919820481729", "IN")
-        assertTrue("Unloaded/tampered model must safely abstain", assessment.isAbstain)
-        assertEquals(ThreatTier.UNKNOWN, assessment.threatTier)
+        // Tamper with root node threshold while keeping original checksum in metadata
+        rootNode.put("threshold", 0.99999999)
+
+        val tamperedRiskModel = PhoneNumberRiskModel()
+        val loadResult = tamperedRiskModel.loadModelFromJsonString(json.toString())
+
+        assertFalse("Tampered model payload must fail SHA-256 verification and return false on load", loadResult)
+
+        // Safe fail-closed check
+        val fallbackAssessment = tamperedRiskModel.assessNumber("+919820481729", "IN")
+        assertTrue("Tampered model assessment must fail closed to abstain", fallbackAssessment.isAbstain)
+        assertEquals(ThreatTier.UNKNOWN, fallbackAssessment.threatTier)
     }
 }
