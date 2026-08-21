@@ -1,6 +1,8 @@
 ﻿"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2)
-Strict Group-Based Prefix Partitioning (Guaranteed Exactly 0 Shared 7-Digit Prefixes)
+Strict Group-Based Prefix Partitioning & Dedicated Benchmark Partition
+Guarantees Exactly 0 Shared 7-Digit Prefixes Across All 6 Split Pairs:
+(Train, Val), (Train, Test), (Train, Bench), (Val, Test), (Val, Bench), (Test, Bench)
 """
 
 import os
@@ -18,49 +20,60 @@ DATA_DIR = os.path.dirname(__file__)
 
 PREFIX_CLUSTERS = {
     "train": {
-        "group_id": "GRP_TRAIN_01",
-        "india_trai_140": ["1400", "1401", "1402", "1403"],
-        "india_jio": ["600", "700", "808"],
-        "india_airtel": ["981", "982", "983"],
-        "india_vi": ["971", "972"],
-        "india_bsnl": ["941", "942"],
-        "india_pstn": ["22", "33", "80"],
-        "india_bank": ["180011", "180012", "180018"],
-        "us_area": ["212", "415", "312", "713"],
-        "us_marketing": ["844"],
-        "ofcom_bulk": ["0843", "0844"],
-        "ofcom_mobile": ["07700"],
-        "wangiri_codes": ["8811", "8821", "247", "232"]
+        "india_trai_140": {"group_id": "GRP_TRAI_140_TR", "prefixes": ["1400", "1401"]},
+        "india_jio": {"group_id": "GRP_IN_JIO_TR", "prefixes": ["600", "601"]},
+        "india_airtel": {"group_id": "GRP_IN_AIRTEL_TR", "prefixes": ["981", "982"]},
+        "india_vi": {"group_id": "GRP_IN_VI_TR", "prefixes": ["971", "972"]},
+        "india_bsnl": {"group_id": "GRP_IN_BSNL_TR", "prefixes": ["941", "942"]},
+        "india_pstn": {"group_id": "GRP_IN_PSTN_TR", "prefixes": ["22"]},
+        "india_bank": {"group_id": "GRP_IN_BANK_TR", "prefixes": ["180011", "180012"]},
+        "us_area": {"group_id": "GRP_US_AREA_TR", "prefixes": ["212", "415"]},
+        "us_marketing": {"group_id": "GRP_US_MKTG_TR", "prefixes": ["844"]},
+        "ofcom_bulk": {"group_id": "GRP_UK_BULK_TR", "prefixes": ["0843"]},
+        "ofcom_mobile": {"group_id": "GRP_UK_MOB_TR", "prefixes": ["07911"]},
+        "wangiri_codes": {"group_id": "GRP_WANGIRI_TR", "prefixes": ["8811", "247"]}
     },
     "val": {
-        "group_id": "GRP_VAL_02",
-        "india_trai_140": ["1404", "1405", "1406"],
-        "india_jio": ["701", "809"],
-        "india_airtel": ["984", "985"],
-        "india_vi": ["973", "974"],
-        "india_bsnl": ["943", "944"],
-        "india_pstn": ["44", "20"],
-        "india_bank": ["180020", "180022"],
-        "us_area": ["650", "305", "206"],
-        "us_marketing": ["855"],
-        "ofcom_bulk": ["0845"],
-        "ofcom_mobile": ["07800"],
-        "wangiri_codes": ["252", "224", "255"]
+        "india_trai_140": {"group_id": "GRP_TRAI_140_VAL", "prefixes": ["1402", "1403"]},
+        "india_jio": {"group_id": "GRP_IN_JIO_VAL", "prefixes": ["700", "701"]},
+        "india_airtel": {"group_id": "GRP_IN_AIRTEL_VAL", "prefixes": ["983", "984"]},
+        "india_vi": {"group_id": "GRP_IN_VI_VAL", "prefixes": ["973", "974"]},
+        "india_bsnl": {"group_id": "GRP_IN_BSNL_VAL", "prefixes": ["943", "944"]},
+        "india_pstn": {"group_id": "GRP_IN_PSTN_VAL", "prefixes": ["33"]},
+        "india_bank": {"group_id": "GRP_IN_BANK_VAL", "prefixes": ["180020", "180021"]},
+        "us_area": {"group_id": "GRP_US_AREA_VAL", "prefixes": ["312", "713"]},
+        "us_marketing": {"group_id": "GRP_US_MKTG_VAL", "prefixes": ["855"]},
+        "ofcom_bulk": {"group_id": "GRP_UK_BULK_VAL", "prefixes": ["0844"]},
+        "ofcom_mobile": {"group_id": "GRP_UK_MOB_VAL", "prefixes": ["07912"]},
+        "wangiri_codes": {"group_id": "GRP_WANGIRI_VAL", "prefixes": ["8821", "232"]}
     },
     "test": {
-        "group_id": "GRP_TEST_03",
-        "india_trai_140": ["1407", "1408", "1409"],
-        "india_jio": ["702", "897"],
-        "india_airtel": ["986", "987", "988"],
-        "india_vi": ["975", "976"],
-        "india_bsnl": ["945", "946"],
-        "india_pstn": ["11", "79"],
-        "india_bank": ["180042", "180026"],
-        "us_area": ["617", "404", "512", "408"],
-        "us_marketing": ["866"],
-        "ofcom_bulk": ["0870", "0871"],
-        "ofcom_mobile": ["07900"],
-        "wangiri_codes": ["257", "269", "239", "870"]
+        "india_trai_140": {"group_id": "GRP_TRAI_140_TE", "prefixes": ["1404", "1405"]},
+        "india_jio": {"group_id": "GRP_IN_JIO_TE", "prefixes": ["702", "703"]},
+        "india_airtel": {"group_id": "GRP_IN_AIRTEL_TE", "prefixes": ["985", "986"]},
+        "india_vi": {"group_id": "GRP_IN_VI_TE", "prefixes": ["975", "976"]},
+        "india_bsnl": {"group_id": "GRP_IN_BSNL_TE", "prefixes": ["945", "946"]},
+        "india_pstn": {"group_id": "GRP_IN_PSTN_TE", "prefixes": ["44"]},
+        "india_bank": {"group_id": "GRP_IN_BANK_TE", "prefixes": ["180030", "180031"]},
+        "us_area": {"group_id": "GRP_US_AREA_TE", "prefixes": ["650", "305"]},
+        "us_marketing": {"group_id": "GRP_US_MKTG_TE", "prefixes": ["866"]},
+        "ofcom_bulk": {"group_id": "GRP_UK_BULK_TE", "prefixes": ["0845"]},
+        "ofcom_mobile": {"group_id": "GRP_UK_MOB_TE", "prefixes": ["07913"]},
+        "wangiri_codes": {"group_id": "GRP_WANGIRI_TE", "prefixes": ["252", "224"]}
+    },
+    "benchmark": {
+        "india_trai_140": {"group_id": "GRP_TRAI_140_BM", "prefixes": ["1406", "1407"]},
+        "india_jio": {"group_id": "GRP_IN_JIO_BM", "prefixes": ["808", "809"]},
+        "india_airtel": {"group_id": "GRP_IN_AIRTEL_BM", "prefixes": ["987", "988"]},
+        "india_vi": {"group_id": "GRP_IN_VI_BM", "prefixes": ["977", "978"]},
+        "india_bsnl": {"group_id": "GRP_IN_BSNL_BM", "prefixes": ["947", "948"]},
+        "india_pstn": {"group_id": "GRP_IN_PSTN_BM", "prefixes": ["11"]},
+        "india_bank": {"group_id": "GRP_IN_BANK_BM", "prefixes": ["180040", "180041"]},
+        "us_area": {"group_id": "GRP_US_AREA_BM", "prefixes": ["206", "617"]},
+        "us_marketing": {"group_id": "GRP_US_MKTG_BM", "prefixes": ["877"]},
+        "ofcom_bulk": {"group_id": "GRP_UK_BULK_BM", "prefixes": ["0870"]},
+        "ofcom_mobile": {"group_id": "GRP_UK_MOB_BM", "prefixes": ["07914"]},
+        "wangiri_codes": {"group_id": "GRP_WANGIRI_BM", "prefixes": ["255", "257"]}
     }
 }
 
@@ -73,14 +86,13 @@ def generate_strictly_invalid_number(index: int, split_name: str) -> Tuple[str, 
         "letters_inside", "impossible_country_code", "special_symbols"
     ]
     t = sub_types[index % len(sub_types)]
-    tag = "1" if split_name == "train" else ("4" if split_name == "val" else "7")
+    tag = "1" if split_name == "train" else ("4" if split_name == "val" else ("7" if split_name == "test" else "9"))
     
     if t == "all_zeros":
-        # Under 7 digits so no 7-digit prefix collision
-        return "00000" if split_name == "train" else ("0000" if split_name == "val" else "000"), "All zeros invalid sequence"
+        return "00000" if split_name == "train" else ("0000" if split_name == "val" else ("000" if split_name == "test" else "00")), "All zeros invalid sequence"
     elif t == "too_short":
-        base = 10 if split_name == "train" else (40 if split_name == "val" else 70)
-        return str(base + (index % 25)), "Length below international minimum"
+        base = 10 if split_name == "train" else (40 if split_name == "val" else (70 if split_name == "test" else 90))
+        return str(base + (index % 10)), "Length below international minimum"
     elif t == "overlength":
         return f"+99{tag}0{index:04d}123456789012345", "Length exceeds E.164 15-digit maximum"
     elif t == "impossible_leading_zero":
@@ -99,7 +111,7 @@ def build_dataset_suite(seed=42):
     np.random.seed(seed)
 
     print("="*85)
-    print("      AEGIS-PNP2 DATASET GENERATOR (STRICT GROUP-BASED PREFIX ISOLATION)")
+    print("      AEGIS-PNP2 DATASET GENERATOR (6-WAY STRICT GROUP-BASED PREFIX ISOLATION)")
     print("="*85)
 
     seen_numbers: Set[str] = set()
@@ -107,31 +119,34 @@ def build_dataset_suite(seed=42):
 
     def generate_sample(target_label: str, split_name: str) -> Optional[Dict[str, Any]]:
         nonlocal invalid_counter
-        active_split = split_name if split_name in ("train", "val", "test") else "test"
-        clusters = PREFIX_CLUSTERS[active_split]
-        group_id = clusters["group_id"]
+        clusters = PREFIX_CLUSTERS[split_name]
         country = "IN"
         raw_num = ""
         category = ""
         label_code = 0
         desc = ""
+        chosen_group_id = ""
 
         # 1. CONFIRMED_SCAM
         if target_label == "CONFIRMED_SCAM":
             sub = random.choice(["wangiri", "premium_fraud", "spoofed_satellite"])
             if sub == "wangiri":
-                code = random.choice(clusters["wangiri_codes"])
+                grp = clusters["wangiri_codes"]
+                chosen_group_id = grp["group_id"]
+                code = random.choice(grp["prefixes"])
                 raw_num = f"+{code}{generate_random_digits(7)}"
                 category = "Wangiri High-Cost Trap"
                 desc = f"Wangiri toll fraud destination (+{code})"
             elif sub == "premium_fraud":
-                pfx = "19001" if split_name == "train" else ("19002" if split_name == "val" else "19003")
+                pfx = "19002" if split_name == "train" else ("19003" if split_name == "val" else ("19004" if split_name == "test" else "19005"))
+                chosen_group_id = f"GRP_US_PREMIUM_{split_name.upper()}"
                 raw_num = f"+1900{pfx[4:]}{generate_random_digits(6)}"
                 country = "US"
                 category = "Premium Rate Fraud"
                 desc = "High-charge premium rate service line"
             else:
-                tag = "1" if split_name == "train" else ("4" if split_name == "val" else "7")
+                tag = "1" if split_name == "train" else ("4" if split_name == "val" else ("7" if split_name == "test" else "9"))
+                chosen_group_id = f"GRP_SATELLITE_{split_name.upper()}"
                 raw_num = f"+881{tag}{generate_random_digits(7)}"
                 category = "Wangiri High-Cost Trap"
                 desc = f"Satellite callback trap (+881{tag})"
@@ -141,26 +156,34 @@ def build_dataset_suite(seed=42):
         elif target_label == "TELEMARKETING_SPAM":
             sub = random.choice(["trai_140", "ofcom_bulk", "nanpa_marketing", "low_entropy_dialer"])
             if sub == "trai_140":
-                pfx = random.choice(clusters["india_trai_140"])
+                grp = clusters["india_trai_140"]
+                chosen_group_id = grp["group_id"]
+                pfx = random.choice(grp["prefixes"])
                 raw_num = f"+91{pfx}{generate_random_digits(6)}"
                 country = "IN"
                 category = "Commercial Telemarketing"
                 desc = f"Registered TRAI 140 telemarketing series ({pfx})"
             elif sub == "ofcom_bulk":
-                pfx = random.choice(clusters["ofcom_bulk"])
+                grp = clusters["ofcom_bulk"]
+                chosen_group_id = grp["group_id"]
+                pfx = random.choice(grp["prefixes"])
                 raw_num = f"+44{pfx[1:]}{generate_random_digits(7)}"
                 country = "GB"
                 category = "Commercial Telemarketing"
                 desc = f"OFCOM bulk automated dialer ({pfx})"
             elif sub == "nanpa_marketing":
-                pfx = random.choice(clusters["us_marketing"])
+                grp = clusters["us_marketing"]
+                chosen_group_id = grp["group_id"]
+                pfx = random.choice(grp["prefixes"])
                 raw_num = f"+1{pfx}{generate_random_digits(7)}"
                 country = "US"
                 category = "Commercial Telemarketing"
                 desc = f"NANPA bulk marketing dialer (+1-{pfx})"
             else:
+                grp = clusters["india_jio"]
+                chosen_group_id = f"{grp['group_id']}_ROBOCALL"
                 d = str(random.randint(0, 9))
-                pfx = random.choice(clusters["india_jio"])
+                pfx = random.choice(grp["prefixes"])
                 raw_num = f"+91{pfx}{d * 7}"
                 country = "IN"
                 category = "Low-Entropy Automated Robocall"
@@ -170,6 +193,7 @@ def build_dataset_suite(seed=42):
         # 3. INVALID
         elif target_label == "INVALID":
             invalid_counter += 1
+            chosen_group_id = f"GRP_INVALID_{split_name.upper()}"
             raw_num, desc = generate_strictly_invalid_number(invalid_counter, split_name)
             country = "IN"
             category = "Invalid Number Structure"
@@ -180,17 +204,23 @@ def build_dataset_suite(seed=42):
             sub_c = random.choice(["IN", "US", "GB"])
             if sub_c == "IN":
                 op = random.choice(["india_jio", "india_airtel", "india_vi", "india_bsnl"])
-                pfx = random.choice(clusters[op])
+                grp = clusters[op]
+                chosen_group_id = grp["group_id"]
+                pfx = random.choice(grp["prefixes"])
                 raw_num = f"+91{pfx}{generate_random_digits(7)}"
                 country = "IN"
                 desc = f"Standard Indian cellular subscriber ({pfx})"
             elif sub_c == "US":
-                area = random.choice(clusters["us_area"])
+                grp = clusters["us_area"]
+                chosen_group_id = grp["group_id"]
+                area = random.choice(grp["prefixes"])
                 raw_num = f"+1{area}{generate_random_digits(7)}"
                 country = "US"
                 desc = f"Standard US subscriber (Area {area})"
             else:
-                pfx = random.choice(clusters["ofcom_mobile"])
+                grp = clusters["ofcom_mobile"]
+                chosen_group_id = grp["group_id"]
+                pfx = random.choice(grp["prefixes"])
                 raw_num = f"+44{pfx[1:]}{generate_random_digits(6)}"
                 country = "GB"
                 desc = "Standard UK mobile subscriber"
@@ -201,20 +231,26 @@ def build_dataset_suite(seed=42):
         else:
             sub = random.choice(["bank_care", "emergency", "pstn_landline"])
             if sub == "bank_care":
-                pfx = random.choice(clusters["india_bank"])
+                grp = clusters["india_bank"]
+                chosen_group_id = grp["group_id"]
+                pfx = random.choice(grp["prefixes"])
                 country = "IN"
                 raw_num = f"+91{pfx}{generate_random_digits(5)}"
                 category = "Bank Toll-Free Care"
                 desc = f"Verified corporate customer service line (+91-{pfx})"
             elif sub == "emergency":
+                chosen_group_id = f"GRP_EMERGENCY_{split_name.upper()}"
                 if split_name == "train": raw_num = "112"
                 elif split_name == "val": raw_num = "911"
-                else: raw_num = "1930"
-                country = "IN" if raw_num in ("112", "1930") else "US"
+                elif split_name == "test": raw_num = "1930"
+                else: raw_num = "999"
+                country = "IN" if raw_num in ("112", "1930") else ("GB" if raw_num == "999" else "US")
                 category = "Emergency & Public Service"
                 desc = "Recognized national emergency helpline"
             else:
-                pfx = random.choice(clusters["india_pstn"])
+                grp = clusters["india_pstn"]
+                chosen_group_id = grp["group_id"]
+                pfx = random.choice(grp["prefixes"])
                 raw_num = f"+91{pfx}{generate_random_digits(8)}"
                 country = "IN"
                 category = "PSTN Geographic Landline"
@@ -224,6 +260,11 @@ def build_dataset_suite(seed=42):
         e164, cc, nat, std_l, is_v = normalize_and_parse(raw_num, country)
         norm_key = e164 if e164 else raw_num
 
+        # Generator Validation Assertion Check:
+        # Non-INVALID samples MUST be valid according to libphonenumber
+        if target_label != "INVALID" and not is_v:
+            return None
+        # INVALID samples MUST NOT be valid
         if target_label == "INVALID" and is_v:
             return None
 
@@ -236,7 +277,7 @@ def build_dataset_suite(seed=42):
             "raw_number": raw_num,
             "normalized_e164": norm_key,
             "country": country,
-            "group_id": group_id,
+            "group_id": chosen_group_id,
             "split": split_name,
             "category": category,
             "label_name": target_label,
@@ -252,7 +293,7 @@ def build_dataset_suite(seed=42):
         weights = list(target_distribution.values())
 
         attempts = 0
-        while len(samples) < n_samples and attempts < n_samples * 45:
+        while len(samples) < n_samples and attempts < n_samples * 50:
             attempts += 1
             chosen_label = random.choices(labels, weights=weights, k=1)[0]
             s = generate_sample(chosen_label, split_name)
@@ -276,9 +317,9 @@ def build_dataset_suite(seed=42):
 
     # 4. Natural Prevalence Benchmark (5,000)
     prev_dist = {"BENIGN": 0.40, "UNKNOWN": 0.40, "TELEMARKETING_SPAM": 0.10, "CONFIRMED_SCAM": 0.05, "INVALID": 0.05}
-    prev_samples = build_split(5000, prev_dist, "test")
+    prev_samples = build_split(5000, prev_dist, "benchmark")
 
-    # Audit & Assertions
+    # Audit & 6-Way Assertions
     def get_7digit_prefixes(samples):
         pfxs = set()
         for s in samples:
@@ -288,14 +329,35 @@ def build_dataset_suite(seed=42):
         return pfxs
 
     train_pfxs = get_7digit_prefixes(train_samples)
+    val_pfxs = get_7digit_prefixes(val_samples)
     test_pfxs = get_7digit_prefixes(test_samples)
-    shared_pfxs = len(train_pfxs.intersection(test_pfxs))
+    bench_pfxs = get_7digit_prefixes(prev_samples)
+
+    tr_val_overlap = len(train_pfxs.intersection(val_pfxs))
+    tr_te_overlap = len(train_pfxs.intersection(test_pfxs))
+    tr_bm_overlap = len(train_pfxs.intersection(bench_pfxs))
+    val_te_overlap = len(val_pfxs.intersection(test_pfxs))
+    val_bm_overlap = len(val_pfxs.intersection(bench_pfxs))
+    te_bm_overlap = len(test_pfxs.intersection(bench_pfxs))
 
     invalid_test = [s for s in test_samples if s["label_name"] == "INVALID"]
     invalid_accepted = sum(1 for s in invalid_test if normalize_and_parse(s["raw_number"], s["country"])[4] is True)
 
-    assert shared_pfxs == 0, f"FATAL AUDIT FAILURE: Found {shared_pfxs} shared 7-digit prefixes between Train and Test splits!"
-    assert invalid_accepted == 0, f"FATAL AUDIT FAILURE: Found {invalid_accepted} invalid test samples accepted as valid!"
+    print(f"[*] 7-Digit Overlap Audit:")
+    print(f"    - Train vs Val:       {tr_val_overlap} (STRICT ZERO)")
+    print(f"    - Train vs Test:      {tr_te_overlap} (STRICT ZERO)")
+    print(f"    - Train vs Benchmark: {tr_bm_overlap} (STRICT ZERO)")
+    print(f"    - Val vs Test:        {val_te_overlap} (STRICT ZERO)")
+    print(f"    - Val vs Benchmark:   {val_bm_overlap} (STRICT ZERO)")
+    print(f"    - Test vs Benchmark:  {te_bm_overlap} (STRICT ZERO)")
+
+    assert tr_val_overlap == 0, f"FATAL: Train vs Val overlap is {tr_val_overlap}!"
+    assert tr_te_overlap == 0, f"FATAL: Train vs Test overlap is {tr_te_overlap}!"
+    assert tr_bm_overlap == 0, f"FATAL: Train vs Benchmark overlap is {tr_bm_overlap}!"
+    assert val_te_overlap == 0, f"FATAL: Val vs Test overlap is {val_te_overlap}!"
+    assert val_bm_overlap == 0, f"FATAL: Val vs Benchmark overlap is {val_bm_overlap}!"
+    assert te_bm_overlap == 0, f"FATAL: Test vs Benchmark overlap is {te_bm_overlap}!"
+    assert invalid_accepted == 0, f"FATAL: {invalid_accepted} invalid test samples accepted as valid!"
 
     with open(os.path.join(DATA_DIR, "train_dataset.json"), "w", encoding="utf-8") as f:
         json.dump(train_samples, f, indent=2)
@@ -306,13 +368,12 @@ def build_dataset_suite(seed=42):
     with open(os.path.join(DATA_DIR, "natural_prevalence_benchmark.json"), "w", encoding="utf-8") as f:
         json.dump(prev_samples, f, indent=2)
 
-    print(f"Generated train_dataset.json: {len(train_samples)} rows (Group: GRP_TRAIN_01)")
-    print(f"Generated val_dataset.json: {len(val_samples)} rows (Group: GRP_VAL_02)")
-    print(f"Generated test_untouched_holdout.json: {len(test_samples)} rows (Group: GRP_TEST_03)")
+    print(f"Generated train_dataset.json: {len(train_samples)} rows")
+    print(f"Generated val_dataset.json: {len(val_samples)} rows")
+    print(f"Generated test_untouched_holdout.json: {len(test_samples)} rows")
     print(f"Generated natural_prevalence_benchmark.json: {len(prev_samples)} rows")
-    print(f"[*] 7-Digit Prefix Overlap (Train vs Test): {shared_pfxs} (STRICT ZERO SHARED CLUSTERS)")
     print(f"[*] Test Set Invalid Samples: {len(invalid_test)} (Accepted as valid: {invalid_accepted} / {len(invalid_test)})")
-    print("[+] All dataset audit assertions PASSED.")
+    print("[+] All 6-way dataset audit assertions PASSED.")
 
 if __name__ == "__main__":
     build_dataset_suite()

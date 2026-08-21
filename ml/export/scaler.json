@@ -1,185 +1,116 @@
 {
-  "num_features": 36,
-  "scalers": [
-    {
-      "idx": 0,
-      "name": "num_is_valid_e164",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 1,
-      "name": "num_national_length_normalized",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 2,
-      "name": "num_length_discrepancy",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 3,
-      "name": "digit_shannon_entropy",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 4,
-      "name": "digit_unique_ratio",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 5,
-      "name": "digit_max_repeat_run",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 6,
-      "name": "digit_max_sequential_asc",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 7,
-      "name": "digit_max_sequential_desc",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 8,
-      "name": "digit_alternating_pattern_density",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 9,
-      "name": "digit_repeated_block_density",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 10,
-      "name": "digit_palindrome_symmetry",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 11,
-      "name": "digit_trailing_zeros_count",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 12,
-      "name": "digit_leading_digit_distribution",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 13,
-      "name": "plan_is_tollfree",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 14,
-      "name": "plan_is_premium_rate",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 15,
-      "name": "plan_is_shared_cost",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 16,
-      "name": "plan_is_voip_virtual",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 17,
-      "name": "plan_is_mobile",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 18,
-      "name": "plan_is_fixed_line",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 19,
-      "name": "plan_is_uan_shortcode",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 20,
-      "name": "risk_wangiri_high_cost_prefix",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 21,
-      "name": "risk_telemarketing_series",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 22,
-      "name": "risk_unallocated_exchange_code",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 23,
-      "name": "risk_short_code_spoofing",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 24,
-      "name": "hard_neg_legitimate_bank_support",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 25,
-      "name": "hard_neg_emergency_service",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 26,
-      "name": "geo_is_same_country",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 27,
-      "name": "geo_country_risk_tier",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 28,
-      "name": "joint_wangiri_callback_trap",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 29,
-      "name": "joint_voip_robocall_pattern",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 30,
-      "name": "joint_spoofed_short_dialer",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 31,
-      "name": "joint_telemarketer_block",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 32,
-      "name": "digit_variance_density",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 33,
-      "name": "digit_consecutive_diff_sum",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 34,
-      "name": "plan_is_personal_number",
-      "max_scale": 1.0
-    },
-    {
-      "idx": 35,
-      "name": "plan_is_pager",
-      "max_scale": 1.0
-    }
+  "feature_names": [
+    "num_is_valid_e164",
+    "num_national_length_normalized",
+    "num_length_discrepancy",
+    "digit_shannon_entropy",
+    "digit_unique_ratio",
+    "digit_max_repeat_run",
+    "digit_max_sequential_asc",
+    "digit_max_sequential_desc",
+    "digit_alternating_pattern_density",
+    "digit_repeated_block_density",
+    "digit_palindrome_symmetry",
+    "digit_trailing_zeros_count",
+    "digit_leading_digit_distribution",
+    "plan_is_tollfree",
+    "plan_is_premium_rate",
+    "plan_is_shared_cost",
+    "plan_is_voip_virtual",
+    "plan_is_mobile",
+    "plan_is_fixed_line",
+    "plan_is_uan_shortcode",
+    "risk_wangiri_high_cost_prefix",
+    "risk_telemarketing_series",
+    "risk_unallocated_exchange_code",
+    "risk_short_code_spoofing",
+    "hard_neg_legitimate_bank_support",
+    "hard_neg_emergency_service",
+    "geo_is_same_country",
+    "geo_country_risk_tier",
+    "joint_wangiri_callback_trap",
+    "joint_voip_robocall_pattern",
+    "joint_spoofed_short_dialer",
+    "joint_telemarketer_block",
+    "digit_variance_density",
+    "digit_consecutive_diff_sum",
+    "plan_is_personal_number",
+    "plan_is_pager"
+  ],
+  "scale": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "min": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
   ]
 }

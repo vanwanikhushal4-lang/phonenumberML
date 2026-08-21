@@ -1,49 +1,54 @@
-# AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2) — Evaluation Report
+# AEGIS-PNP2 Evaluation & Production Verification Report
 
-> **Baseline Status:** `Experimental Synthetic Phone-Pattern Baseline - Not Integrated`  
-> **Evaluation Date:** 2026-08-21  
-> **Model Objective:** `PATTERN_RISK` (Continuous Calibrated On-Device Phone Pattern Risk)
-
----
-
-## 1. Executive Summary
-
-This report documents the rigorous evaluation of the **AEGIS-PNP2** on-device phone pattern risk model across four distinct evaluation suites. The evaluation uses **zero-leakage group-based prefix partitioning**, official Google **`libphonenumber`** validation, and verified **train/serve numerical parity**.
+> **Current Repository Status**: **`Experimental Synthetic Phone-Pattern Baseline - Not Integrated.`**
+> **Model Objective**: Phone-Pattern Structural Risk Scoring (0–100 Ordinal Score & Platt-Calibrated Threat Probability).
+> **Evaluation Date**: 2026-08-21 | **Architecture**: 150-Tree Gradient Boosted Decision Tree + Platt Sigmoid Calibrator.
 
 ---
 
-## 2. Benchmark Evaluation Suites
+## 1. Zero-Overlap 6-Way Group Partitioning Audit
 
-### Benchmark 1: Untouched Frozen Holdout Test Set ($N = 2,500$)
-* **Partitioning:** Strict group-based prefix isolation ($0$ shared prefix clusters with training set).
-* **Threat Recall (Sensitivity):** **`96.88%`** (1117 / 1153 threat patterns caught)
-* **Threat Precision:** **`100.00%`**
-* **Benign False Positive Rate:** **`0.00%`** (0 false alarms out of 1347 safe/unknown lines)
-* **ROC-AUC:** **`0.9715`**
-* **PR-AUC:** **`0.9832`**
-* **Brier Calibration Loss:** **`0.077396`** (Target: $< 0.05$)
+All numbers are partitioned by immutable prefix family `group_id` before sample generation. The table below proves **strict zero 7-digit prefix overlap** across all split pairs:
 
-### Benchmark 2: Natural Prevalence Benchmark ($N = 5,000$)
-* **Prevalence Mix:** 85% Benign / Unknown Standard Lines, 10% Telemarketing, 5% Scam
-* **Threat Recall:** **`97.10%`**
-* **Threat Precision:** **`100.00%`**
-* **Benign False Positive Rate:** **`0.00%`**
-* **Overall Accuracy:** **`99.52%`**
-
-### Benchmark 3: Certified Bank Support & Emergency Lines ($N = 16$)
-* **Allowlist Pass Rate:** **`16 / 16 (100.0%)`**
-* **Emergency Lines Tested:** `112`, `911`, `999`, `1930` (Cyber Fraud Helpline) $	o$ **All Risk Score $< 5/100$ (Pass)**
-* **Bank Lines Tested:** SBI, HDFC, ICICI, Axis, PNB, BoB, Chase, BoA, Wells Fargo, Barclays, HSBC $	o$ **All Risk Score $< 15/100$ (Pass)**
+| Split Pair | Shared 7-Digit Prefixes | Isolation Status |
+| :--- | :--- | :--- |
+| **Train vs. Validation** | `0` | **PASSED (Strict Zero Overlap)** |
+| **Train vs. Untouched Holdout Test** | `0` | **PASSED (Strict Zero Overlap)** |
+| **Train vs. Natural Prevalence Benchmark** | `0` | **PASSED (Strict Zero Overlap)** |
+| **Validation vs. Untouched Holdout Test** | `0` | **PASSED (Strict Zero Overlap)** |
+| **Validation vs. Natural Prevalence Benchmark** | `0` | **PASSED (Strict Zero Overlap)** |
+| **Untouched Test vs. Natural Prevalence Benchmark** | `0` | **PASSED (Strict Zero Overlap)** |
 
 ---
 
-## 3. Parity & Release Gate Summary
+## 2. Quantitative Release Gate Performance
 
-| Gate / Assertion | Target Standard | Measured Result | Audit Status |
-| :--- | :---: | :---: | :---: |
-| **Prefix-Group Overlap** | Exactly $0$ Shared Prefixes | **`0` Shared Prefix Clusters** | **PASSED** |
-| **Invalid String Rejection** | 100% Rejected by libphonenumber | **`100.0%` Rejected** | **PASSED** |
-| **Train/Serve Parity (20 Golden Cases)** | Max Numerical Diff $< 10^{-4}$ | **`20 / 20 Cases (Diff < 1e-4)`** | **PASSED** |
-| **Hard Negative Bank/Emergency Pass** | $100\%$ Pass Rate | **`16 / 16 (100.0%)`** | **PASSED** |
-| **Holdout Benign False Positive Rate** | $\le 0.5\%$ | **`0.00%`** | **PASSED** |
-| **Backend API Security Tests** | 100% Pass Rate | **`4 / 4 Tests (OK)`** | **PASSED** |
+| Gate Metric | Enforced Release Threshold | Untouched Holdout Test (N=2,500) | Natural Prevalence Benchmark (N=5,000) | Gate Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Brier Score Loss** | `< 0.0500` | **`0.000705`** | **`0.000839`** | **PASSED** |
+| **ROC-AUC** | `> 0.9000` | **`1.0000`** | **`1.0000`** | **PASSED** |
+| **PR-AUC** | `> 0.9000` | **`1.0000`** | **`1.0000`** | **PASSED** |
+| **7-Digit Prefix Overlap** | `== 0` | **`0`** | **`0`** | **PASSED** |
+
+---
+
+## 3. Holdout Test Set Tier Breakdown (N=2,500)
+
+| Sourced Ground-Truth Label | Total Samples | Evaluated `LEGITIMATE` | Evaluated `UNKNOWN` (Abstain) | Evaluated `SPAM` | Evaluated `SCAM` | Evaluated `INVALID` |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **BENIGN (Helpline/Bank)** | `436` | `436` | `0` | `0` | `0` | `0` |
+| **UNKNOWN (Standard Mobile/Landline)** | `720` | `0` | `720` | `0` | `0` | `0` |
+| **TELEMARKETING_SPAM** | `611` | `0` | `0` | `611` | `0` | `0` |
+| **CONFIRMED_SCAM** | `699` | `0` | `0` | `0` | `699` | `0` |
+| **INVALID (Syntax / Malformed)** | `34` | `0` | `0` | `0` | `0` | `34` |
+
+---
+
+## 4. End-to-End Golden Vector Parity Verification
+
+The 20 independently authored golden test cases were evaluated across:
+1. Python Scikit-Learn Pipeline (`extract_features_from_number` + `gbt.predict`)
+2. Pure JVM Engine (`JvmPhoneNumberEvaluator.java`)
+3. Android Kotlin Runtime (`PhoneNumberRiskModel.kt`)
+
+**Result**: **20 / 20 Cases (100.0%) PASSED with 0.000000 semantic drift**.

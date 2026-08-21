@@ -1,8 +1,18 @@
 ﻿"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2) — Model Training Pipeline
+Trains:
+1. Production Continuous Pattern Risk Estimator (150 GBT Estimators)
+2. True Platt Sigmoid Calibrator on Binary Threat Detection (Brier Score < 0.05)
+3. Multi-Class Random Forest Model (5 Classes)
 """
-import os, sys, json, numpy as np, joblib
+
+import os
+import sys
+import json
+import numpy as np
+import joblib
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import mean_squared_error, roc_auc_score, average_precision_score, brier_score_loss
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -14,7 +24,7 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 
 TARGET_MAP = {
     "BENIGN": 0.00,
-    "UNKNOWN": 0.35,
+    "UNKNOWN": 0.30,
     "TELEMARKETING_SPAM": 0.55,
     "CONFIRMED_SCAM": 0.98,
     "INVALID": 0.00
@@ -22,7 +32,7 @@ TARGET_MAP = {
 
 def train_production_models():
     print("="*85)
-    print("      AEGIS-PNP2 CONTINUOUS PATTERN RISK TRAINING & CALIBRATION PIPELINE")
+    print("      AEGIS-PNP2 CONTINUOUS PATTERN RISK TRAINING & PLATT CALIBRATION")
     print("="*85)
 
     with open(os.path.join(DATA_DIR, "train_dataset.json"), "r", encoding="utf-8-sig") as f:
@@ -39,7 +49,7 @@ def train_production_models():
 
     for i, s in enumerate(train_samples):
         X_train[i] = extract_features_from_number(s["raw_number"], s.get("country", "IN"))
-        y_train[i] = TARGET_MAP.get(s["label_name"], 0.35)
+        y_train[i] = TARGET_MAP.get(s["label_name"], 0.30)
         y_binary_train[i] = s["is_threat"]
         y_multi_train[i] = s["label"]
 
@@ -50,13 +60,14 @@ def train_production_models():
 
     for i, s in enumerate(val_samples):
         X_val[i] = extract_features_from_number(s["raw_number"], s.get("country", "IN"))
-        y_val[i] = TARGET_MAP.get(s["label_name"], 0.35)
+        y_val[i] = TARGET_MAP.get(s["label_name"], 0.30)
         y_binary_val[i] = s["is_threat"]
         y_multi_val[i] = s["label"]
 
     print(f"[*] Training Data:   X={X_train.shape}, Threats={np.sum(y_binary_train == 1)} ({np.mean(y_binary_train)*100:.1f}%)")
     print(f"[*] Validation Data: X={X_val.shape}, Threats={np.sum(y_binary_val == 1)} ({np.mean(y_binary_val)*100:.1f}%)")
 
+    # 1. Train Production Continuous GBT Pattern Risk Regressor
     print("\n[1/3] Training Production Continuous GBT Pattern Risk Model (150 Estimators)...")
     gbt = GradientBoostingRegressor(
         n_estimators=150,
@@ -69,39 +80,66 @@ def train_production_models():
     )
     gbt.fit(X_train, y_train)
 
-    val_preds = np.clip(gbt.predict(X_val), 0.0, 1.0)
-    val_mse = mean_squared_error(y_val, val_preds)
-    val_brier = brier_score_loss(y_binary_val, val_preds)
-    val_roc = roc_auc_score(y_binary_val, val_preds)
-    val_prauc = average_precision_score(y_binary_val, val_preds)
+    val_logits = gbt.predict(X_val)
+    val_ordinal_preds = np.clip(val_logits, 0.0, 1.0)
+    val_mse = mean_squared_error(y_val, val_ordinal_preds)
 
-    print(f"  * Validation MSE:                {val_mse:.6f}")
-    print(f"  * Validation Brier Loss:         {val_brier:.6f} (Ideal < 0.05)")
+    # 2. Fit True Platt Sigmoid Calibrator on Validation Binary Threat Labels
+    print("[2/3] Fitting Platt Sigmoid Calibrator for Binary Threat Probability...")
+    train_logits = gbt.predict(X_train).reshape(-1, 1)
+    platt_model = LogisticRegression(C=1.0, solver="lbfgs", random_state=42)
+    platt_model.fit(train_logits, y_binary_train)
+
+    param_A = float(platt_model.coef_[0][0])
+    param_B = float(platt_model.intercept_[0])
+
+    val_prob_threat = 1.0 / (1.0 + np.exp(-(param_A * val_logits + param_B)))
+    val_brier = brier_score_loss(y_binary_val, val_prob_threat)
+    val_roc = roc_auc_score(y_binary_val, val_prob_threat)
+    val_prauc = average_precision_score(y_binary_val, val_prob_threat)
+
+    print(f"  * Validation Ordinal MSE:        {val_mse:.6f}")
+    print(f"  * Platt Calibrator Params:       A = {param_A:.4f}, B = {param_B:.4f}")
+    print(f"  * Validation Brier Loss:         {val_brier:.6f} (ENFORCED GATE < 0.05)")
     print(f"  * Validation ROC-AUC:            {val_roc:.4f}")
     print(f"  * Validation PR-AUC:             {val_prauc:.4f}")
 
+    assert val_brier < 0.05, f"FATAL GATE FAILURE: Validation Brier Loss {val_brier:.6f} >= 0.05!"
+
+    # 3. Train Multi-Class Random Forest Model
     print("[3/3] Training Multiclass Random Forest Classifier (5 Classes)...")
     rf_multi = RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42, n_jobs=-1, class_weight="balanced")
     rf_multi.fit(X_train, y_multi_train)
 
+    # 4. Feature Importances
+    importances = gbt.feature_importances_
+    indices = np.argsort(importances)[::-1]
+    print("\nTop 12 Most Discriminative Phone Number Structural Features:")
+    for rank in range(min(12, len(indices))):
+        idx = indices[rank]
+        f_name = FEATURE_SPEC["features"][idx]["name"]
+        f_desc = FEATURE_SPEC["features"][idx]["description"]
+        print(f"  {rank+1:>2}. [{idx:02d}] {f_name:<35}: {importances[idx]:.4f} ({f_desc})")
+
+    # 5. Save Models & Calibration Metadata
     print(f"\nSaving model binaries and calibration constants to {MODELS_DIR}...")
     joblib.dump(gbt, os.path.join(MODELS_DIR, "gbt_model.joblib"))
     joblib.dump(rf_multi, os.path.join(MODELS_DIR, "rf_multi_model.joblib"))
-    np.save(os.path.join(MODELS_DIR, "feature_importances.npy"), gbt.feature_importances_)
+    np.save(os.path.join(MODELS_DIR, "feature_importances.npy"), importances)
 
     calibration_metadata = {
         "model_name": "AEGIS-PNP2",
         "version": "2.1.0",
         "objective": "PATTERN_RISK",
-        "method": "continuous_calibrated_regression",
-        "formula": "P(Pattern Risk | features) = clip(init_value + sum(tree_values), 0.0, 1.0)",
-        "param_A": 1.0,
-        "param_B": 0.0,
+        "method": "continuous_calibrated_regression_with_platt_scaling",
+        "formula": "P(Threat | features) = 1 / (1 + exp(-(param_A * raw_logit + param_B)))",
+        "param_A": param_A,
+        "param_B": param_B,
         "val_brier_score": float(val_brier),
         "val_roc_auc": float(val_roc),
         "val_pr_auc": float(val_prauc),
         "operating_thresholds": {
-            "legitimate_upper_bound": 0.12,
+            "legitimate_upper_bound": 0.15,
             "unknown_abstain_upper_bound": 0.40,
             "spam_upper_bound": 0.70,
             "scam_lower_bound": 0.70

@@ -1,49 +1,51 @@
-import java.io.*;
-import java.nio.file.*;
-import java.util.*;
-import java.util.regex.*;
 import com.google.i18n.phonenumbers.PhoneNumberUtil;
 import com.google.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberFormat;
 import com.google.i18n.phonenumbers.PhoneNumberUtil.PhoneNumberType;
 import com.google.i18n.phonenumbers.Phonenumber.PhoneNumber;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
- * Pure Java 17 Complete End-to-End Evaluator for AEGIS-PNP2.
- * Loads actual phonenumber_risk_model.json, evaluates 150 GBT trees with init_value,
- * and computes exact calibrated probability, score, tier, confidence, and reason codes.
+ * Pure JVM production evaluator for AEGIS-PNP2 model.
+ * 64-bit IEEE 754 float precision across all 150 GBT trees.
  */
 public class JvmPhoneNumberEvaluator {
 
-    private static final PhoneNumberUtil phoneUtil = PhoneNumberUtil.getInstance();
+    static final PhoneNumberUtil phoneUtil = PhoneNumberUtil.getInstance();
 
-    private static final Set<String> WANGIRI_PREFIXES = new HashSet<>(Arrays.asList(
-        "881", "882", "883", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870", "871", "872", "873"
+    static final Set<String> WANGIRI_PREFIXES = new HashSet<>(Arrays.asList(
+            "881", "882", "883", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870", "871", "872", "873"
     ));
 
-    private static final Set<String> EMERGENCY_SHORTCODES = new HashSet<>(Arrays.asList(
-        "112", "911", "999", "100", "101", "102", "108", "1091", "1930", "000", "110", "119", "17", "18"
+    static final Set<String> EMERGENCY_SHORTCODES = new HashSet<>(Arrays.asList(
+            "112", "911", "999", "100", "101", "102", "108", "1091", "1930", "000", "110", "119", "17", "18"
     ));
 
-    private static final List<String> TELEMARKETING_PREFIXES = Arrays.asList(
-        "^\\+?91140\\d{7}$",
-        "^\\+?4484[345]\\d{7}$",
-        "^\\+?1(844|855|866)\\d{7}$",
-        "^\\+?3389\\d{7}$"
+    static final List<Pattern> TELEMARKETING_PATTERNS = Arrays.asList(
+            Pattern.compile("^\\+?91140\\d{7}$"),
+            Pattern.compile("^\\+?44(84[345]|87[01])\\d{7}$"),
+            Pattern.compile("^\\+?1(833|844|855|866|877|888)\\d{7}$"),
+            Pattern.compile("^\\+?3389\\d{7}$")
     );
 
-    private static final List<String> LEGITIMATE_BANK_PATTERNS = Arrays.asList(
-        "^\\+?911800\\d{4,8}$",
-        "^\\+?1800\\d{7}$",
-        "^\\+?44800\\d{6,8}$",
-        "^\\+?611800\\d{6,8}$",
-        "^\\+?49800\\d{6,8}$",
-        "^\\+?33800\\d{6,8}$"
+    static final List<Pattern> BANK_PATTERNS = Arrays.asList(
+            Pattern.compile("^\\+?911800\\d{4,8}$"),
+            Pattern.compile("^\\+?1800\\d{7}$"),
+            Pattern.compile("^\\+?44800\\d{6,8}$"),
+            Pattern.compile("^\\+?611800\\d{6,8}$"),
+            Pattern.compile("^\\+?49800\\d{6,8}$"),
+            Pattern.compile("^\\+?33800\\d{6,8}$")
     );
 
     static class DecisionNode {
         boolean isLeaf;
         int featureIdx = -1;
-        float threshold = 0.0f;
+        double threshold = 0.0;
         double leafValue = 0.0;
         int leftChild = -1;
         int rightChild = -1;
@@ -52,7 +54,7 @@ public class JvmPhoneNumberEvaluator {
     static class DecisionTree {
         List<DecisionNode> nodes = new ArrayList<>();
 
-        double evaluate(float[] features) {
+        double evaluate(double[] features) {
             int curr = 0;
             while (curr >= 0 && curr < nodes.size()) {
                 DecisionNode n = nodes.get(curr);
@@ -63,7 +65,9 @@ public class JvmPhoneNumberEvaluator {
         }
     }
 
-    static double initValue = 0.415229;
+    static double initValue = 0.0;
+    static double plattParamA = 25.464305;
+    static double plattParamB = -10.880817;
     static List<DecisionTree> loadedTrees = new ArrayList<>();
     static boolean modelInitialized = false;
 
@@ -75,6 +79,16 @@ public class JvmPhoneNumberEvaluator {
             Matcher mInit = Pattern.compile("\"init_value\"\\s*:\\s*([-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)").matcher(content);
             if (mInit.find()) {
                 initValue = Double.parseDouble(mInit.group(1));
+            }
+
+            Matcher mA = Pattern.compile("\"param_a\"\\s*:\\s*([-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)").matcher(content);
+            if (mA.find()) {
+                plattParamA = Double.parseDouble(mA.group(1));
+            }
+
+            Matcher mB = Pattern.compile("\"param_b\"\\s*:\\s*([-+]?[0-9]*\\.?[0-9]+(?:[eE][-+]?[0-9]+)?)").matcher(content);
+            if (mB.find()) {
+                plattParamB = Double.parseDouble(mB.group(1));
             }
 
             loadedTrees.clear();
@@ -98,7 +112,7 @@ public class JvmPhoneNumberEvaluator {
                         Matcher ml = Pattern.compile("\"left_child\"\\s*:\\s*(\\d+)").matcher(nStr);
                         Matcher mr = Pattern.compile("\"right_child\"\\s*:\\s*(\\d+)").matcher(nStr);
                         if (mf.find()) n.featureIdx = Integer.parseInt(mf.group(1));
-                        if (mt.find()) n.threshold = Float.parseFloat(mt.group(1));
+                        if (mt.find()) n.threshold = Double.parseDouble(mt.group(1));
                         if (ml.find()) n.leftChild = Integer.parseInt(ml.group(1));
                         if (mr.find()) n.rightChild = Integer.parseInt(mr.group(1));
                     }
@@ -128,8 +142,8 @@ public class JvmPhoneNumberEvaluator {
         }
 
         String rawClean = rawNumber.trim();
-        String onlyDigits = rawClean.replaceAll("[^\\d]", "");
-        String cleaned = rawClean.replaceAll("[^\\d+]", "");
+        String onlyDigits = rawClean.replaceAll("[^0-9]", "");
+        String cleaned = rawClean.replaceAll("[^0-9+]", "");
 
         if (EMERGENCY_SHORTCODES.contains(onlyDigits)) {
             r.e164 = onlyDigits;
@@ -141,10 +155,7 @@ public class JvmPhoneNumberEvaluator {
             return r;
         }
 
-        boolean allZeros = true;
-        for (char c : onlyDigits.toCharArray()) {
-            if (c != '0') { allZeros = false; break; }
-        }
+        boolean allZeros = onlyDigits.length() > 0 && onlyDigits.matches("^0+$");
         if (allZeros || onlyDigits.length() < 3 || onlyDigits.length() > 15) {
             r.e164 = rawClean;
             r.countryCode = defaultCountry.equals("IN") ? "91" : (defaultCountry.equals("US") ? "1" : "44");
@@ -154,6 +165,24 @@ public class JvmPhoneNumberEvaluator {
             return r;
         }
 
+        for (String wp : WANGIRI_PREFIXES) {
+            if (cleaned.startsWith("+" + wp) || onlyDigits.startsWith(wp)) {
+                String nat = onlyDigits.length() > wp.length() ? onlyDigits.substring(wp.length()) : onlyDigits;
+                r.e164 = "+" + wp + nat;
+                r.countryCode = wp;
+                r.nationalNumber = nat;
+                r.stdLength = 10;
+                r.isValid = true;
+                try {
+                    PhoneNumber parsed = phoneUtil.parse(r.e164, defaultCountry);
+                    r.type = phoneUtil.getNumberType(parsed);
+                } catch (Exception e) {
+                    r.type = PhoneNumberType.UNKNOWN;
+                }
+                return r;
+            }
+        }
+
         try {
             PhoneNumber parsed = phoneUtil.parse(rawClean, defaultCountry);
             r.isValid = phoneUtil.isValidNumber(parsed);
@@ -161,190 +190,218 @@ public class JvmPhoneNumberEvaluator {
             r.countryCode = String.valueOf(parsed.getCountryCode());
             r.nationalNumber = String.valueOf(parsed.getNationalNumber());
             r.type = phoneUtil.getNumberType(parsed);
-            r.stdLength = 10;
+
             if (r.countryCode.equals("33") || r.countryCode.equals("61")) r.stdLength = 9;
             else if (r.countryCode.equals("55")) r.stdLength = 11;
+            else r.stdLength = 10;
             return r;
         } catch (Exception e) {
-            for (String wp : WANGIRI_PREFIXES) {
-                if (cleaned.startsWith("+" + wp) || onlyDigits.startsWith(wp)) {
-                    r.countryCode = wp;
-                    r.nationalNumber = onlyDigits.length() > wp.length() ? onlyDigits.substring(wp.length()) : onlyDigits;
-                    r.e164 = "+" + wp + r.nationalNumber;
-                    r.stdLength = 10;
-                    r.isValid = true;
-                    return r;
-                }
-            }
-
             if (cleaned.startsWith("+91") || (defaultCountry.equals("IN") && onlyDigits.length() >= 10)) {
                 r.countryCode = "91";
-                r.nationalNumber = cleaned.startsWith("+91") || (onlyDigits.startsWith("91") && onlyDigits.length() >= 12) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                r.nationalNumber = cleaned.startsWith("+91") ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
                 r.e164 = "+91" + r.nationalNumber;
-                r.stdLength = 10;
-                r.isValid = (r.nationalNumber.length() >= 10 && r.nationalNumber.length() <= 11);
+                r.isValid = r.nationalNumber.length() == 10;
+                r.type = PhoneNumberType.MOBILE;
             } else if (cleaned.startsWith("+1") || (defaultCountry.equals("US") && onlyDigits.length() == 10)) {
                 r.countryCode = "1";
-                r.nationalNumber = cleaned.startsWith("+1") || (onlyDigits.startsWith("1") && onlyDigits.length() == 11) ? onlyDigits.substring(1) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                r.nationalNumber = cleaned.startsWith("+1") ? onlyDigits.substring(1) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
                 r.e164 = "+1" + r.nationalNumber;
-                r.stdLength = 10;
-                r.isValid = (r.nationalNumber.length() == 10);
+                r.isValid = r.nationalNumber.length() == 10;
+                r.type = PhoneNumberType.FIXED_LINE_OR_MOBILE;
             } else {
+                r.e164 = cleaned.startsWith("+") ? cleaned : ("+" + onlyDigits);
                 r.countryCode = onlyDigits.length() >= 3 ? onlyDigits.substring(0, 3) : onlyDigits;
                 r.nationalNumber = onlyDigits.length() > 3 ? onlyDigits.substring(3) : onlyDigits;
-                r.e164 = "+" + r.countryCode + r.nationalNumber;
-                r.stdLength = 10;
-                r.isValid = (onlyDigits.length() >= 7 && onlyDigits.length() <= 15);
+                r.isValid = onlyDigits.length() >= 7 && onlyDigits.length() <= 15;
             }
             return r;
         }
     }
 
-    public static float[] extractFeatures(String rawNumber, String defaultCountry) {
-        float[] vec = new float[36];
+    public static double[] extractFeatures(String rawNumber, String defaultCountry) {
+        double[] vec = new double[36];
         ParseResult p = normalizeAndParse(rawNumber, defaultCountry);
-        if (p.nationalNumber == null || p.nationalNumber.isEmpty()) return vec;
+        if (p.nationalNumber.isEmpty()) return vec;
 
-        String onlyDigits = rawNumber.trim().replaceAll("[^\\d]", "");
+        String onlyDigits = rawNumber != null ? rawNumber.replaceAll("[^0-9]", "") : "";
         int natLen = p.nationalNumber.length();
         String fullE164 = p.e164;
+        String countryCodeStr = p.countryCode;
+        String natNumStr = p.nationalNumber;
 
-        vec[0] = p.isValid ? 1.0f : 0.0f;
-        vec[1] = Math.min((float) natLen / 15.0f, 1.0f);
-        vec[2] = Math.min((float) Math.abs(natLen - p.stdLength) / 15.0f, 1.0f);
+        // 0. num_is_valid_e164
+        vec[0] = p.isValid ? 1.0 : 0.0;
 
-        float entropy = computeEntropy(p.nationalNumber);
-        vec[3] = Math.min(entropy / 3.321928f, 1.0f);
+        // 1. num_national_length_normalized
+        vec[1] = Math.min((double) natLen / 15.0, 1.0);
 
+        // 2. num_length_discrepancy
+        vec[2] = Math.min((double) Math.abs(natLen - p.stdLength) / 15.0, 1.0);
+
+        // 3. digit_shannon_entropy
+        double entropy = computeEntropy(natNumStr);
+        vec[3] = Math.min(entropy / 3.321928, 1.0);
+
+        // 4. digit_unique_ratio
         Set<Character> uniqueDigits = new HashSet<>();
-        for (char c : p.nationalNumber.toCharArray()) uniqueDigits.add(c);
-        vec[4] = natLen > 0 ? ((float) uniqueDigits.size() / (float) natLen) : 0.0f;
+        for (char c : natNumStr.toCharArray()) uniqueDigits.add(c);
+        vec[4] = natLen > 0 ? ((double) uniqueDigits.size() / (double) natLen) : 0.0;
 
-        int maxRun = computeMaxRepeatRun(p.nationalNumber);
-        vec[5] = Math.min((float) maxRun / 10.0f, 1.0f);
+        // 5. digit_max_repeat_run
+        int maxRun = computeMaxRepeatRun(natNumStr);
+        vec[5] = Math.min((double) maxRun / 10.0, 1.0);
 
-        int maxAsc = computeAscendingRun(p.nationalNumber);
-        int maxDesc = computeDescendingRun(p.nationalNumber);
-        vec[6] = Math.min((float) maxAsc / 10.0f, 1.0f);
-        vec[7] = Math.min((float) maxDesc / 10.0f, 1.0f);
+        // 6 & 7. digit_max_sequential_asc / desc
+        int maxAsc = computeAscendingRun(natNumStr);
+        int maxDesc = computeDescendingRun(natNumStr);
+        vec[6] = Math.min((double) maxAsc / 10.0, 1.0);
+        vec[7] = Math.min((double) maxDesc / 10.0, 1.0);
 
-        vec[8] = computeAlternatingDensity(p.nationalNumber);
-        vec[9] = computeRepeatedBlockDensity(p.nationalNumber);
-        vec[10] = computePalindromeSymmetry(p.nationalNumber);
+        // 8. digit_alternating_pattern_density
+        vec[8] = computeAlternatingDensity(natNumStr);
 
+        // 9. digit_repeated_block_density
+        vec[9] = computeRepeatedBlockDensity(natNumStr);
+
+        // 10. digit_palindrome_symmetry
+        vec[10] = computePalindromeSymmetry(natNumStr);
+
+        // 11. digit_trailing_zeros_count
         int trailingZeros = 0;
         for (int i = natLen - 1; i >= 0; i--) {
-            if (p.nationalNumber.charAt(i) == '0') trailingZeros++;
+            if (natNumStr.charAt(i) == '0') trailingZeros++;
             else break;
         }
-        vec[11] = Math.min((float) trailingZeros / 8.0f, 1.0f);
+        vec[11] = Math.min((double) trailingZeros / 8.0, 1.0);
 
-        if (natLen > 0 && (p.nationalNumber.charAt(0) == '0' || p.nationalNumber.charAt(0) == '1') && (p.countryCode.equals("1") || p.countryCode.equals("91")) && !EMERGENCY_SHORTCODES.contains(onlyDigits) && !p.nationalNumber.startsWith("1800") && !p.nationalNumber.startsWith("1900") && !p.nationalNumber.startsWith("140")) {
-            vec[12] = 1.0f;
+        // 12. digit_leading_zero_or_one
+        if (natLen > 0 && (natNumStr.charAt(0) == '0' || natNumStr.charAt(0) == '1')
+                && (countryCodeStr.equals("1") || countryCodeStr.equals("91"))
+                && !EMERGENCY_SHORTCODES.contains(onlyDigits)
+                && !natNumStr.startsWith("1800") && !natNumStr.startsWith("1900") && !natNumStr.startsWith("140")) {
+            vec[12] = 1.0;
         } else {
-            vec[12] = 0.0f;
+            vec[12] = 0.0;
         }
 
-        boolean isTollfree = (p.type == PhoneNumberType.TOLL_FREE) || p.nationalNumber.startsWith("1800") || p.nationalNumber.startsWith("800") || p.nationalNumber.startsWith("888") || p.nationalNumber.startsWith("877") || p.nationalNumber.startsWith("866") || p.nationalNumber.startsWith("855") || p.nationalNumber.startsWith("844");
-        boolean isPremium = (p.type == PhoneNumberType.PREMIUM_RATE) || (p.nationalNumber.startsWith("1900") || (p.countryCode.equals("1") && p.nationalNumber.startsWith("900")) || (p.countryCode.equals("44") && p.nationalNumber.startsWith("900")) || (p.countryCode.equals("33") && p.nationalNumber.startsWith("89")));
-        boolean isVoip = (p.type == PhoneNumberType.VOIP) || p.nationalNumber.startsWith("140") || p.nationalNumber.startsWith("843");
-        boolean isMobile = (p.type == PhoneNumberType.MOBILE) || ((natLen == 10 && (p.nationalNumber.charAt(0) == '6' || p.nationalNumber.charAt(0) == '7' || p.nationalNumber.charAt(0) == '8' || p.nationalNumber.charAt(0) == '9') && p.countryCode.equals("91")) ||
-                           (natLen == 10 && p.countryCode.equals("1") && !isTollfree && !isPremium) ||
-                           (p.countryCode.equals("44") && p.nationalNumber.startsWith("7")) ||
-                           (p.countryCode.equals("81") && (p.nationalNumber.startsWith("90") || p.nationalNumber.startsWith("80") || p.nationalNumber.startsWith("70"))));
+        // 13 - 19. plan types
+        boolean isTollfree = (p.type == PhoneNumberType.TOLL_FREE) || natNumStr.startsWith("1800") || natNumStr.startsWith("800") || natNumStr.startsWith("888") || natNumStr.startsWith("877") || natNumStr.startsWith("866") || natNumStr.startsWith("855") || natNumStr.startsWith("844");
+        boolean isPremium = (p.type == PhoneNumberType.PREMIUM_RATE) || natNumStr.startsWith("1900") || (countryCodeStr.equals("1") && natNumStr.startsWith("900")) || (countryCodeStr.equals("44") && natNumStr.startsWith("900")) || (countryCodeStr.equals("33") && natNumStr.startsWith("89"));
+        boolean isShared = (p.type == PhoneNumberType.SHARED_COST);
+        boolean isVoip = (p.type == PhoneNumberType.VOIP) || natNumStr.startsWith("140") || natNumStr.startsWith("843");
+        boolean isMobile = (p.type == PhoneNumberType.MOBILE) || (p.type == PhoneNumberType.FIXED_LINE_OR_MOBILE) || (natLen == 10 && (natNumStr.charAt(0) >= '6' && natNumStr.charAt(0) <= '9') && countryCodeStr.equals("91")) || (natLen == 10 && countryCodeStr.equals("1") && !isTollfree && !isPremium) || (countryCodeStr.equals("44") && natNumStr.startsWith("7")) || (countryCodeStr.equals("81") && (natNumStr.startsWith("90") || natNumStr.startsWith("80") || natNumStr.startsWith("70")));
         boolean isFixed = (p.type == PhoneNumberType.FIXED_LINE) || (!isMobile && !isTollfree && !isPremium);
-        boolean isUan = (p.type == PhoneNumberType.UAN) || p.nationalNumber.startsWith("140") || EMERGENCY_SHORTCODES.contains(onlyDigits);
+        boolean isUan = (p.type == PhoneNumberType.UAN) || natNumStr.startsWith("140") || EMERGENCY_SHORTCODES.contains(onlyDigits);
 
-        vec[13] = isTollfree ? 1.0f : 0.0f;
-        vec[14] = isPremium ? 1.0f : 0.0f;
-        vec[15] = (p.type == PhoneNumberType.SHARED_COST) ? 1.0f : 0.0f;
-        vec[16] = isVoip ? 1.0f : 0.0f;
-        vec[17] = isMobile ? 1.0f : 0.0f;
-        vec[18] = isFixed ? 1.0f : 0.0f;
-        vec[19] = isUan ? 1.0f : 0.0f;
+        vec[13] = isTollfree ? 1.0 : 0.0;
+        vec[14] = isPremium ? 1.0 : 0.0;
+        vec[15] = isShared ? 1.0 : 0.0;
+        vec[16] = isVoip ? 1.0 : 0.0;
+        vec[17] = isMobile ? 1.0 : 0.0;
+        vec[18] = isFixed ? 1.0 : 0.0;
+        vec[19] = isUan ? 1.0 : 0.0;
 
-        boolean isWangiri = WANGIRI_PREFIXES.contains(p.countryCode);
+        // 20. risk_wangiri_high_cost_prefix
+        boolean isWangiri = WANGIRI_PREFIXES.contains(countryCodeStr);
         if (!isWangiri) {
             for (String wp : WANGIRI_PREFIXES) {
                 if (onlyDigits.startsWith(wp)) { isWangiri = true; break; }
             }
         }
-        vec[20] = isWangiri ? 1.0f : 0.0f;
+        vec[20] = isWangiri ? 1.0 : 0.0;
 
+        // 21. risk_telemarketing_series
         boolean isTelemarketing = false;
-        for (String pat : TELEMARKETING_PREFIXES) {
-            if (fullE164.matches(pat) || rawNumber.matches(pat)) { isTelemarketing = true; break; }
+        for (Pattern pat : TELEMARKETING_PATTERNS) {
+            if (pat.matcher(fullE164).find() || (rawNumber != null && pat.matcher(rawNumber).find())) {
+                isTelemarketing = true; break;
+            }
         }
-        vec[21] = isTelemarketing ? 1.0f : 0.0f;
+        vec[21] = isTelemarketing ? 1.0 : 0.0;
 
+        // 22. risk_unallocated_exchange_code
         boolean isUnallocated = false;
-        if (p.countryCode.equals("1") && natLen == 10) {
-            String nxx = p.nationalNumber.substring(3, 6);
+        if (countryCodeStr.equals("1") && natLen == 10) {
+            String nxx = natNumStr.substring(3, 6);
             if (nxx.endsWith("11") || nxx.equals("555")) isUnallocated = true;
         }
-        vec[22] = isUnallocated ? 1.0f : 0.0f;
+        vec[22] = isUnallocated ? 1.0 : 0.0;
 
-        vec[23] = (natLen <= 6 && rawNumber.trim().startsWith("+")) ? 1.0f : 0.0f;
+        // 23. risk_shortcode_spoof_candidate
+        vec[23] = (natLen <= 6 && rawNumber != null && rawNumber.trim().startsWith("+")) ? 1.0 : 0.0;
 
-        boolean isBank = isTollfree;
-        if (!isBank) {
-            for (String bp : LEGITIMATE_BANK_PATTERNS) {
-                if (fullE164.matches(bp) || rawNumber.matches(bp)) { isBank = true; break; }
+        // 24. hard_neg_legitimate_bank_support
+        boolean isBank = false;
+        for (Pattern pat : BANK_PATTERNS) {
+            if (pat.matcher(fullE164).find() || (rawNumber != null && pat.matcher(rawNumber).find())) {
+                isBank = true; break;
             }
         }
-        vec[24] = isBank ? 1.0f : 0.0f;
+        vec[24] = isBank ? 1.0 : 0.0;
 
-        vec[25] = (EMERGENCY_SHORTCODES.contains(onlyDigits) || EMERGENCY_SHORTCODES.contains(p.nationalNumber)) ? 1.0f : 0.0f;
+        // 25. hard_neg_emergency_service
+        vec[25] = (EMERGENCY_SHORTCODES.contains(onlyDigits) || EMERGENCY_SHORTCODES.contains(natNumStr)) ? 1.0 : 0.0;
 
-        boolean sameCountry = (defaultCountry.equals("IN") && p.countryCode.equals("91")) ||
-                              (defaultCountry.equals("US") && p.countryCode.equals("1")) ||
-                              (defaultCountry.equals("GB") && p.countryCode.equals("44")) ||
-                              (defaultCountry.equals("FR") && p.countryCode.equals("33")) ||
-                              (defaultCountry.equals("DE") && p.countryCode.equals("49")) ||
-                              (defaultCountry.equals("AU") && p.countryCode.equals("61")) ||
-                              (defaultCountry.equals("JP") && p.countryCode.equals("81")) ||
-                              (defaultCountry.equals("BR") && p.countryCode.equals("55")) ||
-                              (defaultCountry.equals("ID") && p.countryCode.equals("62")) ||
-                              (defaultCountry.equals("NG") && p.countryCode.equals("234"));
-        vec[26] = sameCountry ? 1.0f : 0.0f;
+        // 26. geo_is_same_country
+        boolean sameCountry = (defaultCountry.equals("IN") && countryCodeStr.equals("91")) ||
+                (defaultCountry.equals("US") && countryCodeStr.equals("1")) ||
+                (defaultCountry.equals("GB") && countryCodeStr.equals("44")) ||
+                (defaultCountry.equals("FR") && countryCodeStr.equals("33")) ||
+                (defaultCountry.equals("DE") && countryCodeStr.equals("49")) ||
+                (defaultCountry.equals("AU") && countryCodeStr.equals("61")) ||
+                (defaultCountry.equals("JP") && countryCodeStr.equals("81")) ||
+                (defaultCountry.equals("BR") && countryCodeStr.equals("55")) ||
+                (defaultCountry.equals("ID") && countryCodeStr.equals("62")) ||
+                (defaultCountry.equals("NG") && countryCodeStr.equals("234"));
+        vec[26] = sameCountry ? 1.0 : 0.0;
 
-        if (isWangiri) vec[27] = 1.0f;
-        else if (p.countryCode.equals("91") || p.countryCode.equals("1") || p.countryCode.equals("44") || p.countryCode.equals("61") || p.countryCode.equals("49") || p.countryCode.equals("33") || p.countryCode.equals("81") || p.countryCode.equals("55") || p.countryCode.equals("62") || p.countryCode.equals("234")) vec[27] = 0.10f;
-        else vec[27] = 0.40f;
+        // 27. geo_country_risk_tier
+        if (isWangiri) vec[27] = 1.0;
+        else if (Arrays.asList("91", "1", "44", "61", "49", "33", "81", "55", "62", "234").contains(countryCodeStr)) vec[27] = 0.10;
+        else vec[27] = 0.40;
 
-        vec[28] = (isWangiri && (vec[3] < 0.70f || vec[2] > 0.0f)) ? 1.0f : 0.0f;
-        vec[29] = ((vec[5] >= 0.50f || vec[6] >= 0.60f || vec[7] >= 0.60f || vec[8] >= 0.50f) && vec[24] == 0.0f && vec[25] == 0.0f) ? 1.0f : 0.0f;
-        vec[30] = (vec[2] >= 0.20f && (isPremium || isUnallocated)) ? 1.0f : 0.0f;
-        vec[31] = (isTelemarketing && vec[4] <= 0.70f) ? 1.0f : 0.0f;
+        // 28. joint_wangiri_callback_trap
+        vec[28] = (isWangiri && (vec[3] < 0.70 || vec[2] > 0.0)) ? 1.0 : 0.0;
 
+        // 29. joint_low_entropy_robocall
+        vec[29] = ((vec[5] >= 0.50 || vec[6] >= 0.60 || vec[7] >= 0.60 || vec[8] >= 0.50) && vec[24] == 0.0 && vec[25] == 0.0) ? 1.0 : 0.0;
+
+        // 30. joint_spoofed_short_dialer
+        vec[30] = (vec[2] >= 0.20 && (isPremium || isUnallocated)) ? 1.0 : 0.0;
+
+        // 31. joint_telemarketer_block
+        vec[31] = (isTelemarketing && vec[4] <= 0.70) ? 1.0 : 0.0;
+
+        // 32. digit_variance_density
         if (natLen > 0) {
             int[] counts = new int[10];
-            for (char c : p.nationalNumber.toCharArray()) {
+            for (char c : natNumStr.toCharArray()) {
                 if (c >= '0' && c <= '9') counts[c - '0']++;
             }
-            float mean = (float) natLen / 10.0f;
-            float sumSq = 0.0f;
+            double mean = (double) natLen / 10.0;
+            double sumSq = 0.0;
             for (int count : counts) sumSq += (count - mean) * (count - mean);
-            float var = sumSq / 10.0f;
-            vec[32] = Math.min(var / 5.0f, 1.0f);
+            double v = sumSq / 10.0;
+            vec[32] = Math.min(v / 5.0, 1.0);
         }
 
+        // 33. digit_consecutive_diff_sum
         if (natLen > 1) {
             int diffSum = 0;
             for (int i = 1; i < natLen; i++) {
-                diffSum += Math.abs((p.nationalNumber.charAt(i) - '0') - (p.nationalNumber.charAt(i - 1) - '0'));
+                diffSum += Math.abs((natNumStr.charAt(i) - '0') - (natNumStr.charAt(i - 1) - '0'));
             }
-            vec[33] = Math.min((float) diffSum / (9.0f * (float) (natLen - 1)), 1.0f);
+            vec[33] = Math.min((double) diffSum / (9.0 * (double) (natLen - 1)), 1.0);
         }
 
-        vec[34] = (p.type == PhoneNumberType.PERSONAL_NUMBER) ? 1.0f : 0.0f;
-        vec[35] = (p.type == PhoneNumberType.PAGER) ? 1.0f : 0.0f;
+        vec[34] = 0.0;
+        vec[35] = 0.0;
 
         return vec;
     }
 
-    private static float computeEntropy(String s) {
-        if (s == null || s.isEmpty()) return 0.0f;
+    private static double computeEntropy(String s) {
+        if (s == null || s.isEmpty()) return 0.0;
         int[] freq = new int[10];
         for (char c : s.toCharArray()) if (c >= '0' && c <= '9') freq[c - '0']++;
         double entropy = 0.0;
@@ -355,7 +412,7 @@ public class JvmPhoneNumberEvaluator {
                 entropy -= prob * (Math.log(prob) / Math.log(2.0));
             }
         }
-        return (float) entropy;
+        return entropy;
     }
 
     private static int computeMaxRepeatRun(String s) {
@@ -394,33 +451,33 @@ public class JvmPhoneNumberEvaluator {
         return maxDesc;
     }
 
-    private static float computeAlternatingDensity(String s) {
-        if (s == null || s.length() < 4) return 0.0f;
+    private static double computeAlternatingDensity(String s) {
+        if (s == null || s.length() < 4) return 0.0;
         int count = 0;
         for (int i = 0; i < s.length() - 2; i++) {
             if (s.charAt(i) == s.charAt(i + 2) && s.charAt(i) != s.charAt(i + 1)) count++;
         }
-        return Math.min((float) count / (float) (s.length() - 2), 1.0f);
+        return Math.min((double) count / (double) (s.length() - 2), 1.0);
     }
 
-    private static float computeRepeatedBlockDensity(String s) {
-        if (s == null || s.length() < 4) return 0.0f;
+    private static double computeRepeatedBlockDensity(String s) {
+        if (s == null || s.length() < 4) return 0.0;
         for (int i = 0; i < s.length() - 3; i++) {
-            if (s.substring(i, i + 2).equals(s.substring(i + 2, i + 4))) return 1.0f;
+            if (s.substring(i, i + 2).equals(s.substring(i + 2, i + 4))) return 1.0;
         }
         for (int i = 0; i < s.length() - 5; i++) {
-            if (s.substring(i, i + 3).equals(s.substring(i + 3, i + 6))) return 1.0f;
+            if (s.substring(i, i + 3).equals(s.substring(i + 3, i + 6))) return 1.0;
         }
-        return 0.0f;
+        return 0.0;
     }
 
-    private static float computePalindromeSymmetry(String s) {
-        if (s == null || s.length() < 2) return 0.0f;
+    private static double computePalindromeSymmetry(String s) {
+        if (s == null || s.length() < 2) return 0.0;
         int matches = 0; int len = s.length();
         for (int i = 0; i < len; i++) {
             if (s.charAt(i) == s.charAt(len - 1 - i)) matches++;
         }
-        return (float) matches / (float) len;
+        return (double) matches / (double) len;
     }
 
     public static void main(String[] args) {
@@ -431,7 +488,7 @@ public class JvmPhoneNumberEvaluator {
         loadModelJson(modelPath);
 
         ParseResult p = normalizeAndParse(num, country);
-        float[] features = extractFeatures(num, country);
+        double[] features = extractFeatures(num, country);
 
         double rawLogit = 0.0;
         double calProb = 0.0;
@@ -450,16 +507,16 @@ public class JvmPhoneNumberEvaluator {
             for (DecisionTree t : loadedTrees) {
                 rawLogit += t.evaluate(features);
             }
-            calProb = Math.max(0.0, Math.min(1.0, rawLogit));
-            score = (int) Math.round(calProb * 100.0);
+            calProb = 1.0 / (1.0 + Math.exp(-(plattParamA * rawLogit + plattParamB)));
+            score = (int) Math.round(Math.max(0.0, Math.min(1.0, rawLogit)) * 100.0);
 
-            if (calProb >= 0.70) {
+            if (rawLogit >= 0.70) {
                 tier = "SCAM";
                 confidence = "HIGH";
-            } else if (calProb >= 0.40) {
+            } else if (rawLogit >= 0.40) {
                 tier = "SPAM";
                 confidence = "MEDIUM";
-            } else if (calProb >= 0.12) {
+            } else if (rawLogit >= 0.15) {
                 tier = "UNKNOWN";
                 confidence = "LOW";
             } else {

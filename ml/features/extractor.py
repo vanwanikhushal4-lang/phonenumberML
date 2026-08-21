@@ -27,8 +27,8 @@ WANGIRI_PREFIXES = {
 # Registered Commercial Telemarketing Series (e.g. India TRAI 140, UK 0843, US 844/855/866 marketing, France 089)
 TELEMARKETING_PREFIXES = [
     r"^\+?91140\d{7}$",
-    r"^\+?4484[345]\d{7}$",
-    r"^\+?1(844|855|866)\d{7}$",
+    r"^\+?44(84[345]|87[01])\d{7}$",
+    r"^\+?1(833|844|855|866|877|888)\d{7}$",
     r"^\+?3389\d{7}$",
 ]
 
@@ -257,7 +257,7 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
     vec[23] = 1.0 if (nat_len <= 6 and str(raw_number).strip().startswith("+")) else 0.0
 
     # 24. Hard Negative: Legitimate bank support pattern
-    is_bank = is_tollfree or any(re.search(bp, full_e164) or re.search(bp, str(raw_number)) for bp in LEGITIMATE_BANK_PATTERNS)
+    is_bank = any(re.search(bp, full_e164) or re.search(bp, str(raw_number)) for bp in LEGITIMATE_BANK_PATTERNS)
     vec[24] = 1.0 if is_bank else 0.0
 
     # 25. Hard Negative: Emergency service

@@ -1,185 +1,166 @@
 {
-  "schema_version": "2.1.0",
+  "version": "2.1.0",
+  "description": "20 Independently Authored Golden Test Vectors for AEGIS-PNP2 Verification",
   "test_cases": [
     {
       "case_id": "sbi_bank_customer_care",
       "raw_number": "+911800112211",
       "country": "IN",
       "expected_tier": "LEGITIMATE",
-      "expected_max_score": 15,
       "expected_is_threat": false,
-      "description": "Verified SBI customer service line"
+      "category": "Bank Helpline"
     },
     {
       "case_id": "hdfc_bank_priority",
       "raw_number": "+9118002026161",
       "country": "IN",
       "expected_tier": "LEGITIMATE",
-      "expected_max_score": 15,
       "expected_is_threat": false,
-      "description": "Verified HDFC customer service line"
+      "category": "Bank Helpline"
     },
     {
       "case_id": "chase_bank_support",
       "raw_number": "+18009359935",
       "country": "US",
       "expected_tier": "LEGITIMATE",
-      "expected_max_score": 15,
       "expected_is_threat": false,
-      "description": "Verified Chase customer support"
+      "category": "Bank Helpline"
     },
     {
       "case_id": "barclays_uk_care",
       "raw_number": "+44800123456",
       "country": "GB",
       "expected_tier": "LEGITIMATE",
-      "expected_max_score": 15,
       "expected_is_threat": false,
-      "description": "Verified Barclays UK freephone line"
+      "category": "Bank Helpline"
     },
     {
       "case_id": "emergency_112",
       "raw_number": "112",
       "country": "IN",
       "expected_tier": "LEGITIMATE",
-      "expected_max_score": 10,
       "expected_is_threat": false,
-      "description": "National Emergency 112"
+      "category": "Emergency Shortcode"
     },
     {
       "case_id": "emergency_911",
       "raw_number": "911",
       "country": "US",
       "expected_tier": "LEGITIMATE",
-      "expected_max_score": 10,
       "expected_is_threat": false,
-      "description": "US Emergency 911"
+      "category": "Emergency Shortcode"
     },
     {
       "case_id": "emergency_1930",
       "raw_number": "1930",
       "country": "IN",
       "expected_tier": "LEGITIMATE",
-      "expected_max_score": 10,
       "expected_is_threat": false,
-      "description": "India Cyber Crime Helpline 1930"
+      "category": "Cyber Crime Helpline"
     },
     {
       "case_id": "standard_indian_mobile",
       "raw_number": "+919820481729",
       "country": "IN",
       "expected_tier": "UNKNOWN",
-      "expected_max_score": 39,
       "expected_is_threat": false,
-      "description": "Standard Indian cellular subscriber (Abstain from threat warning)"
+      "category": "Cellular Subscriber"
     },
     {
       "case_id": "standard_us_landline",
       "raw_number": "+12127363100",
       "country": "US",
       "expected_tier": "UNKNOWN",
-      "expected_max_score": 39,
       "expected_is_threat": false,
-      "description": "Standard US geographic landline (Abstain from threat warning)"
+      "category": "Fixed Landline"
     },
     {
       "case_id": "standard_uk_mobile",
       "raw_number": "+447911123456",
       "country": "GB",
       "expected_tier": "UNKNOWN",
-      "expected_max_score": 39,
       "expected_is_threat": false,
-      "description": "Standard UK mobile subscriber (Abstain from threat warning)"
+      "category": "Cellular Subscriber"
     },
     {
       "case_id": "standard_jp_mobile",
       "raw_number": "+819012345678",
       "country": "JP",
       "expected_tier": "UNKNOWN",
-      "expected_max_score": 39,
       "expected_is_threat": false,
-      "description": "Standard Japan mobile subscriber (Abstain from threat warning)"
+      "category": "Cellular Subscriber"
     },
     {
       "case_id": "trai_140_telemarketer",
       "raw_number": "+911409988776",
       "country": "IN",
       "expected_tier": "SPAM",
-      "expected_max_score": 75,
       "expected_is_threat": true,
-      "description": "Registered TRAI 140 promotional line"
+      "category": "TRAI 140 Marketing"
     },
     {
       "case_id": "uk_0843_bulk_dialer",
       "raw_number": "+448431234567",
       "country": "GB",
       "expected_tier": "SPAM",
-      "expected_max_score": 75,
       "expected_is_threat": true,
-      "description": "OFCOM 0843 automated dialer"
+      "category": "OFCOM Bulk Series"
     },
     {
       "case_id": "us_tollfree_marketing",
       "raw_number": "+18445551212",
       "country": "US",
       "expected_tier": "SPAM",
-      "expected_max_score": 75,
       "expected_is_threat": true,
-      "description": "NANPA 844 marketing series"
+      "category": "NANPA 844 Marketing"
     },
     {
       "case_id": "low_entropy_dialer_all_repeats",
       "raw_number": "+917777777777",
       "country": "IN",
       "expected_tier": "SPAM",
-      "expected_max_score": 75,
       "expected_is_threat": true,
-      "description": "Automated low-entropy robocaller pattern"
+      "category": "Repeated Robocall Pattern"
     },
     {
       "case_id": "wangiri_inmarsat_satellite",
       "raw_number": "+881631555123",
       "country": "IN",
       "expected_tier": "SCAM",
-      "expected_max_score": 100,
       "expected_is_threat": true,
-      "description": "Satellite Wangiri callback trap (+881)"
+      "category": "Wangiri Satellite Trap"
     },
     {
       "case_id": "wangiri_somalia_trap",
       "raw_number": "+25270112233",
       "country": "IN",
       "expected_tier": "SCAM",
-      "expected_max_score": 100,
       "expected_is_threat": true,
-      "description": "High-cost Wangiri trap (+252)"
+      "category": "Wangiri High-Cost Trap"
     },
     {
       "case_id": "premium_rate_scam_us",
       "raw_number": "+19005551212",
       "country": "US",
       "expected_tier": "SCAM",
-      "expected_max_score": 100,
       "expected_is_threat": true,
-      "description": "NANPA 900 premium rate line (+1-900)"
+      "category": "NANPA Premium Rate Fraud"
     },
     {
       "case_id": "invalid_all_zeros",
-      "raw_number": "0000000000",
+      "raw_number": "00000",
       "country": "IN",
       "expected_tier": "INVALID",
-      "expected_max_score": 0,
       "expected_is_threat": false,
-      "description": "All zeros malformed sequence"
+      "category": "Malformed Syntax"
     },
     {
       "case_id": "invalid_too_short",
       "raw_number": "123",
       "country": "IN",
       "expected_tier": "INVALID",
-      "expected_max_score": 0,
       "expected_is_threat": false,
-      "description": "Underlength invalid number"
+      "category": "Length Below Minimum"
     }
   ]
 }

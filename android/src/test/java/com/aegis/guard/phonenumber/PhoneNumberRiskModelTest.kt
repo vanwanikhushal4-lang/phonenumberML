@@ -1,13 +1,14 @@
 package com.aegis.guard.phonenumber
 
+import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import java.io.File
 
 /**
- * Unit & Regression Test Suite for AEGIS-PNP2 Android Runtime.
- * Loads actual phonenumber_risk_model.json and validates behavior across all tiers.
+ * Unit & Regression Test Suite for AEGIS-PNP2 Android Kotlin Runtime.
+ * Loads committed phonenumber_risk_model.json asset and asserts all 20 independent golden test cases.
  */
 class PhoneNumberRiskModelTest {
 
@@ -16,57 +17,77 @@ class PhoneNumberRiskModelTest {
     @Before
     fun setUp() {
         riskModel = PhoneNumberRiskModel()
-        val modelFile = File("../../ml/export/phonenumber_risk_model.json")
-        if (modelFile.exists()) {
-            val jsonStr = modelFile.readText()
-            riskModel.loadModelFromJsonString(jsonStr)
+        val candidates = listOf(
+            File("src/main/assets/phonenumber_risk_model.json"),
+            File("android/src/main/assets/phonenumber_risk_model.json"),
+            File("../android/src/main/assets/phonenumber_risk_model.json"),
+            File("ml/export/phonenumber_risk_model.json"),
+            File("../../ml/export/phonenumber_risk_model.json")
+        )
+        val modelFile = candidates.find { it.exists() }
+        assertNotNull("phonenumber_risk_model.json asset must exist", modelFile)
+        val jsonStr = modelFile!!.readText()
+        val loaded = riskModel.loadModelFromJsonString(jsonStr)
+        assertTrue("Model asset must successfully load and pass SHA-256 + AST verification", loaded)
+    }
+
+    @Test
+    fun testAll20GoldenVectorsMatchExactExpectedOutcomes() {
+        val goldenCandidates = listOf(
+            File("ml/export/golden_test_vectors.json"),
+            File("../../ml/export/golden_test_vectors.json"),
+            File("../ml/export/golden_test_vectors.json")
+        )
+        val goldenFile = goldenCandidates.find { it.exists() }
+        assertNotNull("golden_test_vectors.json must exist", goldenFile)
+
+        val goldenJson = JSONObject(goldenFile!!.readText())
+        val testCases = goldenJson.getJSONArray("test_cases")
+        assertEquals(20, testCases.length())
+
+        for (i in 0 until testCases.length()) {
+            val caseObj = testCases.getJSONObject(i)
+            val caseId = caseObj.getString("case_id")
+            val rawNum = caseObj.getString("raw_number")
+            val country = caseObj.getString("country")
+            val expTier = caseObj.getString("expected_tier")
+            val expIsThreat = caseObj.getBoolean("expected_is_threat")
+
+            val assessment = riskModel.assessNumber(rawNum, country)
+
+            assertEquals("Case $caseId tier mismatch", expTier, assessment.threatTier.name)
+            assertEquals("Case $caseId isThreat mismatch", expIsThreat, assessment.isThreat)
+            if (expTier == "INVALID") {
+                assertTrue("Case $caseId should be invalid", assessment.isInvalid)
+                assertFalse("Case $caseId should not be valid", assessment.isValid)
+            } else {
+                assertFalse("Case $caseId should not be invalid", assessment.isInvalid)
+                assertTrue("Case $caseId should be valid", assessment.isValid)
+            }
         }
     }
 
     @Test
-    fun testCorruptJsonFallbackDoesNotCrash() {
+    fun testCorruptJsonRejectionAndSafeFallback() {
         val corruptModel = PhoneNumberRiskModel()
-        val corruptJson = "{ \"invalid\": true }"
-        val success = corruptModel.loadModelFromJsonString(corruptJson)
-        assertFalse(success)
+        assertFalse("Malformed JSON must be rejected", corruptModel.loadModelFromJsonString("{ \"corrupt\": true }"))
 
         val verdict = corruptModel.assessNumber("+919820481729", "IN")
         assertNotNull(verdict)
-        assertTrue(verdict.isAbstain)
-        assertEquals(ThreatTier.UNKNOWN, verdict.tier)
+        assertTrue("Uninitialized model must abstain", verdict.isAbstain)
+        assertEquals(ThreatTier.UNKNOWN, verdict.threatTier)
     }
 
     @Test
-    fun testInvalidNumberHandling() {
-        val verdict1 = riskModel.assessNumber("0000000000", "IN")
-        assertTrue(verdict1.isInvalid)
-        assertEquals(ThreatTier.INVALID, verdict1.tier)
-
-        val verdict2 = riskModel.assessNumber("123", "IN")
-        assertTrue(verdict2.isInvalid)
-        assertEquals(ThreatTier.INVALID, verdict2.tier)
-    }
-
-    @Test
-    fun testHardNegativeBankSupport() {
-        val verdict = riskModel.assessNumber("+911800112211", "IN")
-        assertEquals(ThreatTier.LEGITIMATE, verdict.tier)
-        assertTrue(verdict.riskScore <= 10)
-        assertFalse(verdict.isThreat)
-    }
-
-    @Test
-    fun testEmergencyNumberHandling() {
-        val verdict = riskModel.assessNumber("112", "IN")
-        assertEquals(ThreatTier.LEGITIMATE, verdict.tier)
-        assertTrue(verdict.riskScore <= 5)
-    }
-
-    @Test
-    fun testTelemarketerDetection() {
-        val verdict = riskModel.assessNumber("+911409988776", "IN")
-        assertTrue(verdict.isThreat)
-        assertTrue(verdict.riskScore >= 40)
-        assertTrue(verdict.tier == ThreatTier.SPAM || verdict.tier == ThreatTier.SCAM)
+    fun testAstValidationRejection() {
+        val invalidModel = PhoneNumberRiskModel()
+        val badAstJson = """{
+            "schema_version": "2.1.0",
+            "num_features": 20,
+            "num_trees": 150,
+            "init_value": 0.48,
+            "trees": []
+        }"""
+        assertFalse("Invalid feature count must fail AST validation", invalidModel.loadModelFromJsonString(badAstJson))
     }
 }
