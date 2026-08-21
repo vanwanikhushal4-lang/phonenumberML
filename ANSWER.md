@@ -2,7 +2,7 @@
 
 > **Implementation Branch**: `feature/pnp2-corrections`  
 > **Target Production Branch**: `main`  
-> **Reviewed Commit Base**: `c5cb1058234154bac554b4f58d97d2a369a9b758` / `d172655`  
+> **Reviewed Commit Base**: `725db5d8b36ac47ce59083e4dfb75483e57c7fbd` / `54ed381`  
 > **Model Objective**: `PATTERN_RISK` — On-device deterministic structural anomaly risk estimation and advisory warning system.  
 > **Repository**: `https://github.com/vanwanikhushal4-lang/phonenumberML.git`
 
@@ -10,40 +10,35 @@
 
 ## 1. Executive Summary & Resolution Matrix
 
-All items documented in the latest automated review (`CORRECTION.md`, commit `d172655`) have been systematically implemented, verified, and locked with clean-worktree CI assertions across Python, JVM, Android Kotlin, and FastAPI backend runtimes.
+All items documented in the latest automated review (`CORRECTION.md`, commit `54ed381`) have been systematically implemented, verified, and locked with clean-worktree CI assertions across Python, JVM, Android Kotlin, and FastAPI backend runtimes.
 
 | Correction ID | Severity | Area | Status | Verification & Resolution Summary |
 | :--- | :--- | :--- | :---: | :--- |
 | **COR-001** | **High** | False-Positive Regression Suite | **RESOLVED** | Expanded canonical corpus to **39 vectors** covering all NANPA toll-free series (`800, 833, 844, 855, 866, 877, 888`) and sovereign foreign codes (`+252` Somalia, `+232` Sierra Leone, `+224` Guinea, `+255` Tanzania, `+257` Burundi, `+269` Comoros) + malformed length & fragments. Passes 39/39 across Python, JVM, Kotlin, and FastAPI. |
 | **COR-002** | **Critical** | Grounded Data & Prefix Isolation | **RESOLVED** | Sourced official numbering-plan structures (TRAI TCCCPR 2018, NANPA, OFCOM, ITU-T); enforced strict **10-way 7-digit prefix isolation** (0 shared prefixes); froze immutable holdouts (`dataset_manifest.json` with SHA-256 and LF line endings). |
-| **COR-003** | **Critical** | 4-Way Cross-Runtime Parity & CI | **RESOLVED** | `PhoneNumberRiskModelTest.kt` directly validates all 36 feature values, raw logits, calibrated probabilities, scores, reason codes, and tiers within $1\times 10^{-4}$ tolerance. `test_end_to_end_parity.py` validates Python vs JVM vs FastAPI vs Golden outcomes (39/39 PASSED). |
+| **COR-003** | **Critical** | 4-Way Cross-Runtime Parity & CI | **RESOLVED** | `PhoneNumberRiskModelTest.kt` directly validates all 36 feature values, raw logits, calibrated probabilities, scores, E.164 normalization, reason codes, and tiers within $1\times 10^{-4}$ tolerance. `test_end_to_end_parity.py` validates Python vs JVM vs FastAPI vs Golden outcomes (39/39 PASSED). |
 | **COR-004** | **High** | Real SHA-256 Model Integrity | **RESOLVED** | Canonical tree AST payload hashing in Kotlin using `MessageDigest.getInstance("SHA-256")` and `MessageDigest.isEqual(...)`; unit test verifies threshold tampering fails closed. |
-| **COR-005** | **Critical** | Probability Threshold Semantics | **RESOLVED** | Synchronized operating thresholds across Python, JVM, Kotlin, and FastAPI: `0.10` (Legitimate), `0.60` (Unknown/Abstain), `0.98` (Spam), `0.98` (Scam). Verified reviewer counterexamples `+448453722722` (Scam) and `+919472476956` (Spam) produce identical decisions everywhere. |
+| **COR-005** | **Critical** | Probability Threshold Semantics | **RESOLVED** | Synchronized operating thresholds across Python, JVM, Kotlin, and FastAPI: `0.10` (Legitimate), `0.60` (Unknown/Abstain), `0.98` (Spam), `0.98` (Scam). Verified reviewer counterexamples `+448453722722` (Scam) and `+919472476956` (Spam) produce identical decisions everywhere. Defined score semantics consistently. |
 | **COR-006** | **Critical** | Backend Deployment Security | **RESOLVED** | Removed all production fallback secrets; startup fails closed if `AEGIS_SERVER_API_KEY` is missing or $<32$ characters; constant-time auth via `secrets.compare_digest`; bounded Pydantic schemas; 12/12 automated API tests pass. |
-| **COR-007** | **Critical** | Clean-Clone CI & Truthful Docs | **RESOLVED** | Enforced LF line endings via `.gitattributes`; clean worktree verification in `scripts/run_ci.py` asserts 0 artifact drift across the entire repository; updated `README.md`, `docs/MODEL_CARD.md`, and `docs/EVALUATION_REPORT.md` with truthful verified metrics. |
+| **COR-007** | **Critical** | Clean-Clone CI & Truthful Docs | **RESOLVED** | Ignored disposable Gradle directories (`.gradle/`, `build/`, `android/build/`); untracked intermediate Joblib binaries in `.gitignore`; clean worktree verification in `scripts/run_ci.py` asserts 0 artifact drift across the entire repository; updated `README.md`, `docs/MODEL_CARD.md`, and `docs/EVALUATION_REPORT.md` with truthful verified metrics. |
 | **COR-008** | **Critical** | Branch Ownership & Isolation | **RESOLVED** | Dedicated implementation branch `feature/pnp2-corrections` created; reviewer-managed branch `codex/phone-ml-review` isolated from implementation commits. |
-| **COR-009** | **Critical** | Non-Circular Golden Oracle | **RESOLVED** | Separated immutable authored semantic expectations from generated reference numeric outputs. `exporter.py` enforces hard assertions against authored expectations (`expected_tier`, `expected_is_threat`) and aborts export with `ValueError` if the model drifts from authored expectations. |
+| **COR-009** | **Critical** | Non-Circular Golden Oracle & Negative Controls | **RESOLVED** | Stored immutable semantic expectations in independent fixture `ml/evaluation/fixtures/canonical_semantic_expectations.json`. `exporter.py` enforces hard assertions against authored expectations. Added `ml/evaluation/test_negative_semantic_controls.py` and Kotlin negative controls to prove that semantic regressions fail CI. |
 
 ---
 
 ## 2. Detailed Technical Resolutions
 
-### COR-009: Non-Circular Golden Vector Validation & Immutable Semantic Expectations
-* Separated authored human expectations (`expected_tier`, `expected_is_threat`, `expected_is_valid`, `category`, `case_id`) from generated numeric references (`reference_features`, `reference_raw_logit`, `reference_calibrated_probability`, `reference_score`).
-* In `ml/export/exporter.py`, hard assertions compare model predictions against authored expectations:
-  ```python
-  if pred_tier != case["expected_tier"]:
-      raise ValueError(f"CRITICAL SEMANTIC REGRESSION: Case '{case['case_id']}' predicted '{pred_tier}', but independently authored expected tier is '{case['expected_tier']}'!")
-  if pred_threat != case["expected_is_threat"]:
-      raise ValueError(f"CRITICAL SEMANTIC REGRESSION: Case '{case['case_id']}' predicted threat={pred_threat}, but independently authored expected threat={case['expected_is_threat']}!")
-  ```
-* If a model change causes any regression on the 39 canonical cases, export aborts and CI fails immediately.
+### COR-009: Independent Canonical Semantic Fixture & Negative Controls Gate
+* Created standalone immutable fixture [`ml/evaluation/fixtures/canonical_semantic_expectations.json`](file:///C:/Users/user/Documents/phonenumberML/ml/evaluation/fixtures/canonical_semantic_expectations.json) storing 39 test cases with legal provenance (`TRAI TCCCPR 2018`, `NANPA 800`, `OFCOM`, `ITU-T E.164`) and independent expectations (`expected_tier`, `expected_is_threat`, `expected_is_valid`, `expected_is_abstain`, `expected_is_invalid`, `expected_normalized_e164`).
+* In [`ml/export/exporter.py`](file:///C:/Users/user/Documents/phonenumberML/ml/export/exporter.py), hard non-circular assertions enforce that model predictions and normalizations must strictly agree with the independent fixture, raising `ValueError` on any disagreement.
+* Implemented [`ml/evaluation/test_negative_semantic_controls.py`](file:///C:/Users/user/Documents/phonenumberML/ml/evaluation/test_negative_semantic_controls.py) and added it as step 7/8 in `scripts/run_ci.py` to prove that deliberate semantic drift, normalization bugs, and feature corruptions fail CI release gates.
 
 ---
 
-### COR-007: Deterministic Training & Entire-Worktree Clean Gate
-* Added deterministic single-threaded fitting (`n_jobs=1`, `random_state=42`) and stable `joblib.dump(..., compress=3)` in `ml/models/train.py`.
-* In `scripts/run_ci.py`, `verify_clean_worktree()` executes `git status --porcelain` across the entire repository. If any tracked or untracked artifact changes after running training, export, parity, evaluation, and security tests, CI fails with exit code 1.
+### COR-007: Disposable Gradle Outputs & Clean Worktree Assertion
+* Added `.gradle/`, `build/`, `**/build/`, `android/build/`, and `android/.gradle/` to `.gitignore` to prevent disposable build outputs from dirtying the worktree.
+* Untracked intermediate python `*.joblib` binaries; release artifacts are strictly the deterministic, checksummed JSON representations (`phonenumber_risk_model.json`, `scaler.json`).
+* In [`scripts/run_ci.py`](file:///C:/Users/user/Documents/phonenumberML/scripts/run_ci.py), `verify_clean_worktree()` asserts that `git status --porcelain` is completely empty across the entire repository.
 
 ---
 
@@ -104,6 +99,7 @@ All items documented in the latest automated review (`CORRECTION.md`, commit `d1
 [+] 3/6 Model Export & Canonical AST SHA-256 Checksum Generation (150 Trees)
 [+] 4/6 Complete 4-Way Prediction Parity (39 / 39 Cases PASSED across Py, JVM, API, Reference)
 [+] 5/6 Untouched Production Holdout Evaluation (Holdout ROC-AUC: 0.9075, PR-AUC: 0.9199)
-[+] 6/6 Backend API Security, Authentication & Rate Limiting (12 / 12 Unit Tests Passed)
-[+] Clean Worktree Verification (0.0% Artifact Drift across entire repository)
+[+] 6/8 Backend API Security, Authentication & Rate Limiting (12 / 12 Unit Tests Passed)
+[+] 7/8 Negative Semantic Controls & Deliberate Regression Gate Tests (4 / 4 Controls Passed)
+[+] 8/8 Clean Worktree Verification (0.0% Artifact Drift across entire repository)
 ```
