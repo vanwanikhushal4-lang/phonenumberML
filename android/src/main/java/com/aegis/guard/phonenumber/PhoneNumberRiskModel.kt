@@ -48,10 +48,10 @@ class PhoneNumberRiskModel(
     companion object {
         const val EXPECTED_FEATURE_COUNT = 36
         const val EXPECTED_TREE_COUNT = 150
-        const val THRESHOLD_LEGITIMATE_UPPER = 0.15
-        const val THRESHOLD_UNKNOWN_UPPER = 0.40
-        const val THRESHOLD_SPAM_UPPER = 0.70
-        const val THRESHOLD_SCAM_LOWER = 0.70
+        const val THRESHOLD_LEGITIMATE_UPPER = 0.10
+        const val THRESHOLD_UNKNOWN_LOWER = 0.10
+        const val THRESHOLD_SPAM_LOWER = 0.60
+        const val THRESHOLD_SCAM_LOWER = 0.98
     }
 
     data class DecisionNode(
@@ -251,9 +251,9 @@ class PhoneNumberRiskModel(
         val score = (max(0.0, min(1.0, rawLogit)) * 100.0).roundToInt()
 
         val (tier, confidence, isThreat, isAbstain) = when {
-            rawLogit >= THRESHOLD_SCAM_LOWER -> Quad(ThreatTier.SCAM, "HIGH", true, false)
-            rawLogit >= THRESHOLD_UNKNOWN_UPPER -> Quad(ThreatTier.SPAM, "MEDIUM", true, false)
-            rawLogit >= THRESHOLD_LEGITIMATE_UPPER -> Quad(ThreatTier.UNKNOWN, "LOW", false, true)
+            calProb >= THRESHOLD_SCAM_LOWER -> Quad(ThreatTier.SCAM, "HIGH", true, false)
+            calProb >= THRESHOLD_SPAM_LOWER -> Quad(ThreatTier.SPAM, "MEDIUM", true, false)
+            calProb >= THRESHOLD_UNKNOWN_LOWER -> Quad(ThreatTier.UNKNOWN, "LOW", false, true)
             else -> Quad(ThreatTier.LEGITIMATE, "HIGH", false, false)
         }
 

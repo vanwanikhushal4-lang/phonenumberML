@@ -4,9 +4,9 @@ Asserts every single release gate from a clean clone:
 1. Frozen Holdout & Benchmark SHA-256 Checksum Verification + 10-Way Isolation Audit
 2. Model Training & Continuous Platt Calibration
 3. Model Export & Checksum Generation (ASSERT: 150 Trees + Canonical SHA-256 Digest)
-4. Complete End-to-End Prediction Parity Suite (ASSERT: 21 / 21 Cases, 0 Drift)
+4. Complete End-to-End Prediction Parity Suite (ASSERT: 29 / 29 Cases, 0 Drift)
 5. Untouched Holdout Test Set Production Evaluation (ASSERT: ROC-AUC >= 0.85, PR-AUC >= 0.80)
-6. Backend API Security, Authentication & Rate Limiting Tests (ASSERT: 8 / 8 PASSED)
+6. Backend API Security, Authentication & Rate Limiting Tests (ASSERT: 10 / 10 PASSED)
 """
 
 import os
@@ -68,8 +68,8 @@ def main():
     # 3. Model Export & Checksum Generation
     run_step("3/6 Model Export & Checksum Generation", [PYTHON, "ml/export/exporter.py"])
 
-    # 4. End-to-End Train/Serve Parity Suite (Python Scikit-Learn vs Pure JVM vs 21 Golden Vectors)
-    run_step("4/6 End-to-End Prediction Parity (Python vs JVM vs Golden 21 Vectors)", [PYTHON, "ml/evaluation/test_end_to_end_parity.py"])
+    # 4. End-to-End Train/Serve Parity Suite (Python Scikit-Learn vs Pure JVM vs 29 Golden Vectors)
+    run_step("4/6 End-to-End Prediction Parity (Python vs JVM vs Golden 29 Vectors)", [PYTHON, "ml/evaluation/test_end_to_end_parity.py"])
 
     # 5. Production Holdout Evaluation & Benchmark Report
     run_step("5/6 Production Holdout Evaluation & Benchmark Report", [PYTHON, "ml/evaluation/evaluate_production.py"])

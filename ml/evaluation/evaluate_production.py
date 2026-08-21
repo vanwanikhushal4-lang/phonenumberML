@@ -1,4 +1,4 @@
-﻿"""
+"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2) — Production Benchmark & Evaluation Report Generator
 Evaluates:
 1. Untouched Frozen Holdout Test Set (2,500 samples)
@@ -103,9 +103,9 @@ def evaluate_production_benchmarks():
                 feats = extract_features_from_number(raw_num, country)
                 raw_l = float(gbt.predict(feats.reshape(1, -1))[0])
                 prob = 1.0 / (1.0 + np.exp(-(param_a * raw_l + param_b)))
-                if raw_l >= 0.70: tier = "SCAM"
-                elif raw_l >= 0.40: tier = "SPAM"
-                elif raw_l >= 0.15: tier = "UNKNOWN"
+                if prob >= 0.98: tier = "SCAM"
+                elif prob >= 0.60: tier = "SPAM"
+                elif prob >= 0.10: tier = "UNKNOWN"
                 else: tier = "LEGITIMATE"
 
             y_true_binary.append(is_threat)

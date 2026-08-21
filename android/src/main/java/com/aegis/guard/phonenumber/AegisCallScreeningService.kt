@@ -37,7 +37,9 @@ class AegisCallScreeningService : CallScreeningService() {
         // 2. Strict Advisory Mode: NEVER block or reject without explicit user rule
         responseBuilder.setDisallowCall(false)
         responseBuilder.setRejectCall(false)
-        responseBuilder.setSilenceCall(false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            responseBuilder.setSilenceCall(false)
+        }
         responseBuilder.setSkipCallLog(false)
         responseBuilder.setSkipNotification(false)
 

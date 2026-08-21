@@ -40,10 +40,10 @@ All numbers are partitioned by immutable prefix family `group_id` before sample 
 
 | Sourced Ground-Truth Label | Total Samples | Evaluated `LEGITIMATE` | Evaluated `UNKNOWN` (Abstain) | Evaluated `SPAM` | Evaluated `SCAM` | Evaluated `INVALID` |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **BENIGN (Helpline/Bank)** | `496` | `266` | `203` | `27` | `0` | `0` |
-| **UNKNOWN (Standard Mobile/Landline)** | `610` | `1` | `566` | `35` | `0` | `8` |
-| **TELEMARKETING_SPAM** | `765` | `0` | `202` | `512` | `51` | `0` |
-| **CONFIRMED_SCAM** | `514` | `0` | `292` | `39` | `183` | `0` |
+| **BENIGN (Helpline/Bank)** | `496` | `266` | `179` | `51` | `0` | `0` |
+| **UNKNOWN (Standard Mobile/Landline)** | `610` | `1` | `532` | `69` | `0` | `8` |
+| **TELEMARKETING_SPAM** | `765` | `0` | `161` | `358` | `246` | `0` |
+| **CONFIRMED_SCAM** | `514` | `0` | `242` | `89` | `183` | `0` |
 | **INVALID (Syntax / Malformed)** | `115` | `0` | `0` | `0` | `0` | `115` |
 
 ---

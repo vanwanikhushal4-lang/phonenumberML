@@ -1,9 +1,9 @@
-"""
+﻿"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2) — Production Model Exporter
 Exports:
 1. phonenumber_risk_model.json with 150 trees, init_value, Platt parameters, SHA-256 integrity hash
 2. scaler.json
-3. golden_test_vectors.json with 20 independently authored test cases
+3. golden_test_vectors.json with 25 independently authored golden test cases
 """
 
 import os
@@ -26,28 +26,38 @@ INDEPENDENT_GOLDEN_VECTORS = [
     {"case_id": "hdfc_bank_priority", "raw_number": "+9118002026161", "country": "IN", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Bank Helpline"},
     {"case_id": "chase_bank_support", "raw_number": "+18009359935", "country": "US", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Bank Helpline"},
     {"case_id": "barclays_uk_care", "raw_number": "+44800123456", "country": "GB", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Bank Helpline"},
+    {"case_id": "us_tollfree_800_standard", "raw_number": "+18005550100", "country": "US", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "NANPA 800 Toll-Free Line"},
     {"case_id": "emergency_112", "raw_number": "112", "country": "IN", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Emergency Shortcode"},
     {"case_id": "emergency_911", "raw_number": "911", "country": "US", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Emergency Shortcode"},
     {"case_id": "emergency_1930", "raw_number": "1930", "country": "IN", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Cyber Crime Helpline"},
 
-    # 2. STANDARD LINES (Ordinary Mobile, Landline, and Foreign Subscribers -> UNKNOWN / Abstain)
-    {"case_id": "standard_indian_mobile", "raw_number": "+919820481729", "country": "IN", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Cellular Subscriber"},
-    {"case_id": "standard_us_landline", "raw_number": "+12127363100", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Fixed Landline"},
-    {"case_id": "standard_uk_mobile", "raw_number": "+447911123456", "country": "GB", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Cellular Subscriber"},
-    {"case_id": "standard_jp_mobile", "raw_number": "+819012345678", "country": "JP", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Cellular Subscriber"},
-    {"case_id": "us_tollfree_844_legitimate", "raw_number": "+18445550100", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA Toll-Free Customer Line"},
-    {"case_id": "somalia_standard_mobile", "raw_number": "+252615551234", "country": "SO", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Standard Foreign Cellular Line"},
+    # 2. TOLL-FREE REGRESSION COUNTEREXAMPLES (US 833, 844, 855, 866, 877, 888 -> UNKNOWN / Abstain)
+    {"case_id": "us_tollfree_833_standard", "raw_number": "+18335550101", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA 833 Toll-Free Line"},
+    {"case_id": "us_tollfree_844_standard", "raw_number": "+18445550102", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA 844 Toll-Free Line"},
+    {"case_id": "us_tollfree_855_standard", "raw_number": "+18555550103", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA 855 Toll-Free Line"},
+    {"case_id": "us_tollfree_866_standard", "raw_number": "+18665550104", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA 866 Toll-Free Line"},
+    {"case_id": "us_tollfree_877_standard", "raw_number": "+18775550105", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA 877 Toll-Free Line"},
+    {"case_id": "us_tollfree_888_standard", "raw_number": "+18885550106", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA 888 Toll-Free Line"},
 
-    # 3. TELEMARKETING & AUTOMATED ROBOCALLERS -> SPAM
+    # 3. SOVEREIGN COUNTRY MOBILE SUBSCRIBERS (Standard cellular subscribers -> UNKNOWN / Abstain)
+    {"case_id": "somalia_standard_mobile", "raw_number": "+252615551234", "country": "SO", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Somalia Cellular Subscriber"},
+    {"case_id": "sierra_leone_standard_mobile", "raw_number": "+23276123456", "country": "SL", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Sierra Leone Cellular Subscriber"},
+    {"case_id": "standard_indian_mobile", "raw_number": "+919820481729", "country": "IN", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "India Cellular Subscriber"},
+    {"case_id": "standard_us_landline", "raw_number": "+12127363100", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "US Fixed Landline"},
+    {"case_id": "standard_uk_mobile", "raw_number": "+447911123456", "country": "GB", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "UK Cellular Subscriber"},
+    {"case_id": "standard_jp_mobile", "raw_number": "+819012345678", "country": "JP", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Japan Cellular Subscriber"},
+
+    # 4. TELEMARKETING & AUTOMATED ROBOCALLERS -> SPAM
     {"case_id": "trai_140_telemarketer", "raw_number": "+911409988776", "country": "IN", "expected_tier": "SPAM", "expected_is_threat": True, "category": "TRAI 140 Marketing"},
     {"case_id": "uk_0843_bulk_dialer", "raw_number": "+448431234567", "country": "GB", "expected_tier": "SPAM", "expected_is_threat": True, "category": "OFCOM Bulk Series"},
     {"case_id": "low_entropy_dialer_all_repeats", "raw_number": "+917777777777", "country": "IN", "expected_tier": "SPAM", "expected_is_threat": True, "category": "Repeated Robocall Pattern"},
 
-    # 4. HIGH-CHARGE FRAUD & WANGIRI TRAPS -> SCAM
+    # 5. HIGH-CHARGE FRAUD & WANGIRI TRAPS -> SCAM
     {"case_id": "wangiri_inmarsat_satellite", "raw_number": "+881631555123", "country": "IN", "expected_tier": "SCAM", "expected_is_threat": True, "category": "Wangiri Satellite Trap"},
+    {"case_id": "wangiri_thuraya_satellite", "raw_number": "+882165551234", "country": "IN", "expected_tier": "SCAM", "expected_is_threat": True, "category": "Wangiri Satellite Trap"},
     {"case_id": "premium_rate_scam_us", "raw_number": "+19005551212", "country": "US", "expected_tier": "SCAM", "expected_is_threat": True, "category": "NANPA Premium Rate Fraud"},
 
-    # 5. SYNTAX & STRUCTURE VIOLATIONS -> INVALID
+    # 6. SYNTAX & STRUCTURE VIOLATIONS -> INVALID
     {"case_id": "invalid_all_zeros", "raw_number": "00000", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Syntax"},
     {"case_id": "invalid_too_short", "raw_number": "123", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Length Below Minimum"},
     {"case_id": "invalid_malformed_somalia_fragment", "raw_number": "+2521", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"}
@@ -68,7 +78,7 @@ def export_all():
         "scale": [1.0] * FEATURE_SPEC["num_features"],
         "min": [0.0] * FEATURE_SPEC["num_features"]
     }
-    with open(os.path.join(EXPORT_DIR, "scaler.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(EXPORT_DIR, "scaler.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(scaler_dict, f, indent=2)
     print("[1/3] Exported scaler.json")
 
@@ -134,32 +144,32 @@ def export_all():
             "formula": "P(Threat | features) = 1 / (1 + exp(-(param_a * raw_logit + param_b)))"
         },
         "operating_thresholds": {
-            "legitimate_upper": 0.15,
-            "unknown_upper": 0.40,
-            "spam_upper": 0.70,
-            "scam_lower": 0.70
+            "legitimate_upper": 0.10,
+            "unknown_upper": 0.60,
+            "spam_upper": 0.98,
+            "scam_lower": 0.98
         },
         "trees": trees_list
     }
 
     model_export_path = os.path.join(EXPORT_DIR, "phonenumber_risk_model.json")
-    with open(model_export_path, "w", encoding="utf-8") as f:
+    with open(model_export_path, "w", encoding="utf-8", newline="\n") as f:
         json.dump(model_export_dict, f, indent=2)
     print(f"[2/3] Exported phonenumber_risk_model.json (150 trees, SHA-256: {tree_sha256[:12]}...)")
 
     # 3. Export Golden Test Vectors
     golden_suite = {
         "version": "2.1.0",
-        "description": "20 Independently Authored Golden Test Vectors for AEGIS-PNP2 Verification",
+        "description": f"{len(INDEPENDENT_GOLDEN_VECTORS)} Independently Authored Golden Test Vectors for AEGIS-PNP2 Verification",
         "test_cases": INDEPENDENT_GOLDEN_VECTORS
     }
-    with open(os.path.join(EXPORT_DIR, "golden_test_vectors.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(EXPORT_DIR, "golden_test_vectors.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(golden_suite, f, indent=2)
     print(f"[3/3] Exported golden_test_vectors.json ({len(INDEPENDENT_GOLDEN_VECTORS)} independently authored golden cases)")
 
     # 4. Copy to Android assets
     os.makedirs(ANDROID_ASSETS_DIR, exist_ok=True)
-    with open(os.path.join(ANDROID_ASSETS_DIR, "phonenumber_risk_model.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(ANDROID_ASSETS_DIR, "phonenumber_risk_model.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(model_export_dict, f, indent=2)
     print(f"[+] Copied phonenumber_risk_model.json to Android assets ({ANDROID_ASSETS_DIR})")
 

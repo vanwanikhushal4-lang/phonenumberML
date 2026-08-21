@@ -493,13 +493,13 @@ public class JvmPhoneNumberEvaluator {
             calProb = 1.0 / (1.0 + Math.exp(-(plattParamA * rawLogit + plattParamB)));
             score = (int) Math.round(Math.max(0.0, Math.min(1.0, rawLogit)) * 100.0);
 
-            if (rawLogit >= 0.70) {
+            if (calProb >= 0.98) {
                 tier = "SCAM";
                 confidence = "HIGH";
-            } else if (rawLogit >= 0.40) {
+            } else if (calProb >= 0.60) {
                 tier = "SPAM";
                 confidence = "MEDIUM";
-            } else if (rawLogit >= 0.15) {
+            } else if (calProb >= 0.10) {
                 tier = "UNKNOWN";
                 confidence = "LOW";
             } else {

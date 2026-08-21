@@ -1,4 +1,4 @@
-﻿"""
+"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2)
 End-to-End Prediction Parity Suite with Independent Golden Vectors
 [Python Model] vs [Pure JVM Engine] vs [Independently Authored Expectations]
@@ -79,9 +79,9 @@ def verify_end_to_end_parity():
             raw_l_py = float(gbt_model.predict(v_py.reshape(1, -1))[0])
             prob_py = 1.0 / (1.0 + np.exp(-(param_a * raw_l_py + param_b)))
             score_py = int(round(max(0.0, min(1.0, raw_l_py)) * 100))
-            if raw_l_py >= 0.70: tier_py = "SCAM"
-            elif raw_l_py >= 0.40: tier_py = "SPAM"
-            elif raw_l_py >= 0.15: tier_py = "UNKNOWN"
+            if prob_py >= 0.98: tier_py = "SCAM"
+            elif prob_py >= 0.60: tier_py = "SPAM"
+            elif prob_py >= 0.10: tier_py = "UNKNOWN"
             else: tier_py = "LEGITIMATE"
 
         # 2. JVM Pipeline

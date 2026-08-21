@@ -1,6 +1,6 @@
 {
   "version": "2.1.0",
-  "description": "20 Independently Authored Golden Test Vectors for AEGIS-PNP2 Verification",
+  "description": "29 Independently Authored Golden Test Vectors for AEGIS-PNP2 Verification",
   "test_cases": [
     {
       "case_id": "sbi_bank_customer_care",
@@ -35,6 +35,14 @@
       "category": "Bank Helpline"
     },
     {
+      "case_id": "us_tollfree_800_standard",
+      "raw_number": "+18005550100",
+      "country": "US",
+      "expected_tier": "LEGITIMATE",
+      "expected_is_threat": false,
+      "category": "NANPA 800 Toll-Free Line"
+    },
+    {
       "case_id": "emergency_112",
       "raw_number": "112",
       "country": "IN",
@@ -59,44 +67,52 @@
       "category": "Cyber Crime Helpline"
     },
     {
-      "case_id": "standard_indian_mobile",
-      "raw_number": "+919820481729",
-      "country": "IN",
-      "expected_tier": "UNKNOWN",
-      "expected_is_threat": false,
-      "category": "Cellular Subscriber"
-    },
-    {
-      "case_id": "standard_us_landline",
-      "raw_number": "+12127363100",
+      "case_id": "us_tollfree_833_standard",
+      "raw_number": "+18335550101",
       "country": "US",
       "expected_tier": "UNKNOWN",
       "expected_is_threat": false,
-      "category": "Fixed Landline"
+      "category": "NANPA 833 Toll-Free Line"
     },
     {
-      "case_id": "standard_uk_mobile",
-      "raw_number": "+447911123456",
-      "country": "GB",
-      "expected_tier": "UNKNOWN",
-      "expected_is_threat": false,
-      "category": "Cellular Subscriber"
-    },
-    {
-      "case_id": "standard_jp_mobile",
-      "raw_number": "+819012345678",
-      "country": "JP",
-      "expected_tier": "UNKNOWN",
-      "expected_is_threat": false,
-      "category": "Cellular Subscriber"
-    },
-    {
-      "case_id": "us_tollfree_844_legitimate",
-      "raw_number": "+18445550100",
+      "case_id": "us_tollfree_844_standard",
+      "raw_number": "+18445550102",
       "country": "US",
       "expected_tier": "UNKNOWN",
       "expected_is_threat": false,
-      "category": "NANPA Toll-Free Customer Line"
+      "category": "NANPA 844 Toll-Free Line"
+    },
+    {
+      "case_id": "us_tollfree_855_standard",
+      "raw_number": "+18555550103",
+      "country": "US",
+      "expected_tier": "UNKNOWN",
+      "expected_is_threat": false,
+      "category": "NANPA 855 Toll-Free Line"
+    },
+    {
+      "case_id": "us_tollfree_866_standard",
+      "raw_number": "+18665550104",
+      "country": "US",
+      "expected_tier": "UNKNOWN",
+      "expected_is_threat": false,
+      "category": "NANPA 866 Toll-Free Line"
+    },
+    {
+      "case_id": "us_tollfree_877_standard",
+      "raw_number": "+18775550105",
+      "country": "US",
+      "expected_tier": "UNKNOWN",
+      "expected_is_threat": false,
+      "category": "NANPA 877 Toll-Free Line"
+    },
+    {
+      "case_id": "us_tollfree_888_standard",
+      "raw_number": "+18885550106",
+      "country": "US",
+      "expected_tier": "UNKNOWN",
+      "expected_is_threat": false,
+      "category": "NANPA 888 Toll-Free Line"
     },
     {
       "case_id": "somalia_standard_mobile",
@@ -104,7 +120,47 @@
       "country": "SO",
       "expected_tier": "UNKNOWN",
       "expected_is_threat": false,
-      "category": "Standard Foreign Cellular Line"
+      "category": "Somalia Cellular Subscriber"
+    },
+    {
+      "case_id": "sierra_leone_standard_mobile",
+      "raw_number": "+23276123456",
+      "country": "SL",
+      "expected_tier": "UNKNOWN",
+      "expected_is_threat": false,
+      "category": "Sierra Leone Cellular Subscriber"
+    },
+    {
+      "case_id": "standard_indian_mobile",
+      "raw_number": "+919820481729",
+      "country": "IN",
+      "expected_tier": "UNKNOWN",
+      "expected_is_threat": false,
+      "category": "India Cellular Subscriber"
+    },
+    {
+      "case_id": "standard_us_landline",
+      "raw_number": "+12127363100",
+      "country": "US",
+      "expected_tier": "UNKNOWN",
+      "expected_is_threat": false,
+      "category": "US Fixed Landline"
+    },
+    {
+      "case_id": "standard_uk_mobile",
+      "raw_number": "+447911123456",
+      "country": "GB",
+      "expected_tier": "UNKNOWN",
+      "expected_is_threat": false,
+      "category": "UK Cellular Subscriber"
+    },
+    {
+      "case_id": "standard_jp_mobile",
+      "raw_number": "+819012345678",
+      "country": "JP",
+      "expected_tier": "UNKNOWN",
+      "expected_is_threat": false,
+      "category": "Japan Cellular Subscriber"
     },
     {
       "case_id": "trai_140_telemarketer",
@@ -133,6 +189,14 @@
     {
       "case_id": "wangiri_inmarsat_satellite",
       "raw_number": "+881631555123",
+      "country": "IN",
+      "expected_tier": "SCAM",
+      "expected_is_threat": true,
+      "category": "Wangiri Satellite Trap"
+    },
+    {
+      "case_id": "wangiri_thuraya_satellite",
+      "raw_number": "+882165551234",
       "country": "IN",
       "expected_tier": "SCAM",
       "expected_is_threat": true,

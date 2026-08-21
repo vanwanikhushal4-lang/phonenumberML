@@ -32,7 +32,7 @@ class PhoneNumberRiskModelTest {
     }
 
     @Test
-    fun testAll21GoldenVectorsMatchExactExpectedOutcomes() {
+    fun testAll29GoldenVectorsMatchExactExpectedOutcomes() {
         val goldenCandidates = listOf(
             File("ml/export/golden_test_vectors.json"),
             File("../../ml/export/golden_test_vectors.json"),
@@ -43,7 +43,7 @@ class PhoneNumberRiskModelTest {
 
         val goldenJson = JSONObject(goldenFile!!.readText())
         val testCases = goldenJson.getJSONArray("test_cases")
-        assertEquals(21, testCases.length())
+        assertEquals(29, testCases.length())
 
         for (i in 0 until testCases.length()) {
             val caseObj = testCases.getJSONObject(i)

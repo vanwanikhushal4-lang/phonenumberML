@@ -12,10 +12,10 @@
     "formula": "P(Threat | features) = 1 / (1 + exp(-(param_a * raw_logit + param_b)))"
   },
   "operating_thresholds": {
-    "legitimate_upper": 0.15,
-    "unknown_upper": 0.4,
-    "spam_upper": 0.7,
-    "scam_lower": 0.7
+    "legitimate_upper": 0.1,
+    "unknown_upper": 0.6,
+    "spam_upper": 0.98,
+    "scam_lower": 0.98
   },
   "trees": [
     {

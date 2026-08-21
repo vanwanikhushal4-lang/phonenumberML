@@ -8,17 +8,20 @@ Tests:
 5. In-memory Rate Limiting (429 Too Many Requests after 120 calls)
 6. Pattern assessment with valid & invalid dial strings
 7. Structured IPQS proxy UNAVAILABLE handling without secret leakage
+8. Production Startup Credential Validation (Fails closed on missing or weak secrets)
 """
 
 import os
 import sys
 import unittest
+import importlib
 from fastapi.testclient import TestClient
 
 os.environ["AEGIS_TEST_MODE"] = "1"
-os.environ["AEGIS_SERVER_API_KEY"] = "aegis-production-hardened-strong-key-2026-xyz9876543210"
+os.environ["AEGIS_SERVER_API_KEY"] = "aegis-test-mode-secure-key-32-chars-long-abcdef"
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+import ml.api.server as server_module
 from ml.api.server import app, AEGIS_SERVER_API_KEY, RATE_LIMIT_BUCKET
 
 class ApiServerSecurityTests(unittest.TestCase):
@@ -131,6 +134,38 @@ class ApiServerSecurityTests(unittest.TestCase):
         self.assertEqual(data["status"], "UNAVAILABLE")
         self.assertIsNone(data["fraud_score"])
         self.assertIsNone(data["is_risky"])
+
+    def test_production_mode_missing_secret_fails_startup(self):
+        saved_test_mode = os.environ.get("AEGIS_TEST_MODE")
+        saved_key = os.environ.get("AEGIS_SERVER_API_KEY")
+        try:
+            os.environ["AEGIS_TEST_MODE"] = "0"
+            os.environ["AEGIS_SERVER_API_KEY"] = ""
+            with self.assertRaises(RuntimeError) as ctx:
+                importlib.reload(server_module)
+            self.assertIn("AEGIS_SERVER_API_KEY environment variable is mandatory", str(ctx.exception))
+        finally:
+            if saved_test_mode is not None:
+                os.environ["AEGIS_TEST_MODE"] = saved_test_mode
+            if saved_key is not None:
+                os.environ["AEGIS_SERVER_API_KEY"] = saved_key
+            importlib.reload(server_module)
+
+    def test_production_mode_weak_secret_fails_startup(self):
+        saved_test_mode = os.environ.get("AEGIS_TEST_MODE")
+        saved_key = os.environ.get("AEGIS_SERVER_API_KEY")
+        try:
+            os.environ["AEGIS_TEST_MODE"] = "0"
+            os.environ["AEGIS_SERVER_API_KEY"] = "short-secret"
+            with self.assertRaises(RuntimeError) as ctx:
+                importlib.reload(server_module)
+            self.assertIn("AEGIS_SERVER_API_KEY environment variable is mandatory", str(ctx.exception))
+        finally:
+            if saved_test_mode is not None:
+                os.environ["AEGIS_TEST_MODE"] = saved_test_mode
+            if saved_key is not None:
+                os.environ["AEGIS_SERVER_API_KEY"] = saved_key
+            importlib.reload(server_module)
 
 if __name__ == "__main__":
     unittest.main()

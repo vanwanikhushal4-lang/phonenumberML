@@ -1,14 +1,14 @@
-﻿name: AEGIS-PNP2 Release Gate CI
+name: AEGIS-PNP2 Release Gate CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "**" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "**" ]
 
 jobs:
   release-gates:
-    name: Verify Release Gates & Model Parity
+    name: Verify Release Gates, Android Lint & Model Parity
     runs-on: ubuntu-latest
 
     steps:
@@ -39,6 +39,11 @@ jobs:
             curl -L -o ml/evaluation/lib/libphonenumber-8.13.52.jar https://repo1.maven.org/maven2/com/googlecode/libphonenumber/libphonenumber/8.13.52/libphonenumber-8.13.52.jar
           fi
 
+      - name: Make Gradle Wrapper Executable
+        run: chmod +x gradlew
+
+      - name: Run Android Unit Tests & Lint
+        run: ./gradlew :android:testDebugUnitTest :android:lint --no-daemon --stacktrace
+
       - name: Run Master CI Release Gate Suite
-        run: |
-          python scripts/run_ci.py
+        run: python scripts/run_ci.py

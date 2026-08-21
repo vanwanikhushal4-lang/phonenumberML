@@ -451,7 +451,7 @@ def generate_all_datasets():
     # Save datasets
     def save_json(filename, data):
         path = os.path.join(DATA_DIR, filename)
-        with open(path, "w", encoding="utf-8") as f:
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(data, f, indent=2)
         print(f"[+] Saved {filename} ({len(data)} rows)")
 
@@ -479,7 +479,7 @@ def generate_all_datasets():
             "sha256": file_hash
         }
 
-    with open(os.path.join(DATA_DIR, "dataset_manifest.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(DATA_DIR, "dataset_manifest.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(manifest, f, indent=2)
     print(f"[+] Saved dataset_manifest.json with {len(manifest['datasets'])} immutable SHA-256 hashes")
 

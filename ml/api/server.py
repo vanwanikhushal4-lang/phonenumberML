@@ -1,4 +1,4 @@
-﻿"""
+"""
 AEGIS Phone Number Risk & Reputation Backend Proxy Server (FastAPI)
 Production Hardened:
 - Strict API Token Authentication (X-AEGIS-API-KEY required for all protected endpoints)
@@ -48,10 +48,11 @@ AEGIS_SERVER_API_KEY = os.environ.get("AEGIS_SERVER_API_KEY", "")
 IS_TEST_MODE = os.environ.get("AEGIS_TEST_MODE", "0") == "1"
 
 if not IS_TEST_MODE:
-    if not AEGIS_SERVER_API_KEY or len(AEGIS_SERVER_API_KEY) < 32 or AEGIS_SERVER_API_KEY in ("changeme", "default", "secret", "aegis-production-hardened-key-2026-xyz987"):
-        # For local dev / test run when not in production container, assign strong test token if unset
-        if not AEGIS_SERVER_API_KEY:
-            AEGIS_SERVER_API_KEY = "aegis-production-hardened-strong-key-2026-xyz9876543210"
+    if not AEGIS_SERVER_API_KEY or len(AEGIS_SERVER_API_KEY) < 32 or AEGIS_SERVER_API_KEY in (
+        "changeme", "default", "secret", "aegis-production-hardened-key-2026-xyz987",
+        "aegis-production-hardened-strong-key-2026-xyz9876543210"
+    ):
+        raise RuntimeError("FATAL: AEGIS_SERVER_API_KEY environment variable is mandatory and must contain a cryptographically secure key of at least 32 characters.")
 else:
     if not AEGIS_SERVER_API_KEY:
         AEGIS_SERVER_API_KEY = "aegis-test-mode-secure-key-32-chars-long-abcdef"
