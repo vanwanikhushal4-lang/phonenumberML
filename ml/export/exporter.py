@@ -1,4 +1,4 @@
-﻿"""
+"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2) — Production Model Exporter
 Exports:
 1. phonenumber_risk_model.json with 150 trees, init_value, Platt parameters, SHA-256 integrity hash
@@ -182,8 +182,8 @@ def export_all():
             raw_l = 0.0
             prob = 0.0
             score = 0
-            tier = "INVALID"
-            is_threat = False
+            pred_tier = "INVALID"
+            pred_threat = False
             is_abstain = False
             is_invalid = True
             reason_codes = ["num_is_valid_e164"]
@@ -196,20 +196,20 @@ def export_all():
             score = int(round(max(0.0, min(1.0, raw_l)) * 100.0))
 
             if prob >= 0.98:
-                tier = "SCAM"
-                is_threat = True
+                pred_tier = "SCAM"
+                pred_threat = True
                 is_abstain = False
             elif prob >= 0.60:
-                tier = "SPAM"
-                is_threat = True
+                pred_tier = "SPAM"
+                pred_threat = True
                 is_abstain = False
             elif prob >= 0.10:
-                tier = "UNKNOWN"
-                is_threat = False
+                pred_tier = "UNKNOWN"
+                pred_threat = False
                 is_abstain = True
             else:
-                tier = "LEGITIMATE"
-                is_threat = False
+                pred_tier = "LEGITIMATE"
+                pred_threat = False
                 is_abstain = False
 
             is_invalid = False
@@ -225,21 +225,33 @@ def export_all():
                 reason_codes.append("hard_neg_legitimate_bank_support")
                 explanations.append("Verified legitimate banking customer support or toll-free service")
 
+        # NON-CIRCULAR ASSERTION: Model under test MUST strictly match independently authored expectation
+        if pred_tier != case["expected_tier"]:
+            raise ValueError(
+                f"CRITICAL SEMANTIC REGRESSION: Case '{case['case_id']}' predicted '{pred_tier}', "
+                f"but independently authored expected tier is '{case['expected_tier']}'!"
+            )
+        if pred_threat != case["expected_is_threat"]:
+            raise ValueError(
+                f"CRITICAL SEMANTIC REGRESSION: Case '{case['case_id']}' predicted threat={pred_threat}, "
+                f"but independently authored expected threat={case['expected_is_threat']}!"
+            )
+
         enriched_vectors.append({
             "case_id": case["case_id"],
             "raw_number": raw_num,
             "country": country,
             "category": case["category"],
             "normalized_e164": e164,
+            "expected_tier": case["expected_tier"],
+            "expected_is_threat": case["expected_is_threat"],
             "expected_is_valid": is_v,
-            "expected_is_threat": is_threat,
             "expected_is_abstain": is_abstain,
             "expected_is_invalid": is_invalid,
-            "expected_tier": tier,
-            "expected_raw_logit": round(raw_l, 6),
-            "expected_calibrated_probability": round(prob, 6),
-            "expected_score": score,
-            "expected_features": feats,
+            "reference_raw_logit": round(raw_l, 6),
+            "reference_calibrated_probability": round(prob, 6),
+            "reference_score": score,
+            "reference_features": feats,
             "expected_reason_codes": reason_codes,
             "expected_explanations": explanations
         })

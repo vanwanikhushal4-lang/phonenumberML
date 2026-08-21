@@ -1,4 +1,4 @@
-﻿"""
+"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2) — Model Training Pipeline
 Trains:
 1. Production Continuous Pattern Risk Estimator (150 GBT Estimators)
@@ -117,7 +117,7 @@ def train_production_models():
 
     # 3. Train Multi-Class Random Forest Model
     print("[3/3] Training Multiclass Random Forest Classifier (5 Classes)...")
-    rf_multi = RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42, n_jobs=-1, class_weight="balanced")
+    rf_multi = RandomForestClassifier(n_estimators=100, max_depth=8, random_state=42, n_jobs=1, class_weight="balanced")
     rf_multi.fit(X_train, y_multi_train)
 
     # 4. Feature Importances
@@ -132,8 +132,8 @@ def train_production_models():
 
     # 5. Save Models & Calibration Metadata
     print(f"\nSaving model binaries and calibration constants to {MODELS_DIR}...")
-    joblib.dump(gbt, os.path.join(MODELS_DIR, "gbt_model.joblib"))
-    joblib.dump(rf_multi, os.path.join(MODELS_DIR, "rf_multi_model.joblib"))
+    joblib.dump(gbt, os.path.join(MODELS_DIR, "gbt_model.joblib"), compress=3)
+    joblib.dump(rf_multi, os.path.join(MODELS_DIR, "rf_multi_model.joblib"), compress=3)
     np.save(os.path.join(MODELS_DIR, "feature_importances.npy"), importances)
 
     calibration_metadata = {
@@ -148,13 +148,13 @@ def train_production_models():
         "val_roc_auc": float(val_roc),
         "val_pr_auc": float(val_prauc),
         "operating_thresholds": {
-            "legitimate_upper_bound": 0.15,
-            "unknown_abstain_upper_bound": 0.40,
-            "spam_upper_bound": 0.70,
-            "scam_lower_bound": 0.70
+            "legitimate_upper_bound": 0.10,
+            "unknown_abstain_upper_bound": 0.60,
+            "spam_upper_bound": 0.98,
+            "scam_lower_bound": 0.98
         }
     }
-    with open(os.path.join(MODELS_DIR, "calibration_metadata.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(MODELS_DIR, "calibration_metadata.json"), "w", encoding="utf-8", newline="\n") as f:
         json.dump(calibration_metadata, f, indent=2)
 
     print("Model training & calibration complete.")

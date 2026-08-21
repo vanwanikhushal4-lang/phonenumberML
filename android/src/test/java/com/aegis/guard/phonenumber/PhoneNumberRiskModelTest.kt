@@ -1,4 +1,4 @@
-﻿package com.aegis.guard.phonenumber
+package com.aegis.guard.phonenumber
 
 import org.json.JSONObject
 import org.junit.Assert.*
@@ -59,10 +59,10 @@ class PhoneNumberRiskModelTest {
             val expIsValid = caseObj.getBoolean("expected_is_valid")
             val expIsAbstain = caseObj.getBoolean("expected_is_abstain")
             val expIsInvalid = caseObj.getBoolean("expected_is_invalid")
-            val expRawLogit = caseObj.getDouble("expected_raw_logit")
-            val expCalProb = caseObj.getDouble("expected_calibrated_probability")
-            val expScore = caseObj.getInt("expected_score")
-            val expFeats = caseObj.getJSONArray("expected_features")
+            val expRawLogit = caseObj.getDouble("reference_raw_logit")
+            val expCalProb = caseObj.getDouble("reference_calibrated_probability")
+            val expScore = caseObj.getInt("reference_score")
+            val expFeats = caseObj.getJSONArray("reference_features")
 
             val assessment = riskModel.assessNumber(rawNum, country)
 

@@ -1,4 +1,4 @@
-﻿"""
+"""
 AEGIS-PNP2 Continuous Integration & Release Gate Verification Runner
 Asserts every single release gate from a clean clone:
 1. Frozen Holdout & Benchmark SHA-256 Checksum Verification + 10-Way Isolation Audit
@@ -59,11 +59,11 @@ def verify_clean_worktree():
     print("\n" + "="*90)
     print("[*] RUNNING CI STEP: Clean Worktree Verification")
     print("="*90)
-    res = subprocess.run(["git", "diff", "--exit-code", "ml/export/", "ml/models/saved_models/calibration_metadata.json"], cwd=ROOT_DIR)
-    if res.returncode != 0:
-        print("[!] RELEASE GATE FAILURE: Exported release artifacts drift detected after build!")
-        sys.exit(res.returncode)
-    print("[+] Verified clean worktree on release artifacts (0.0% Artifact Drift).")
+    res = subprocess.run(["git", "status", "--porcelain"], cwd=ROOT_DIR, stdout=subprocess.PIPE, text=True)
+    if res.returncode != 0 or res.stdout.strip():
+        print(f"[!] RELEASE GATE FAILURE: Uncommitted generation artifacts detected in worktree:\n{res.stdout}")
+        sys.exit(1)
+    print("[+] Verified completely clean worktree across entire repository (0.0% Artifact Drift).")
 
 def main():
     print("="*90)

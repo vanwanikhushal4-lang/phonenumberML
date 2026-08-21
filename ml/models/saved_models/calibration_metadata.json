@@ -10,9 +10,9 @@
   "val_roc_auc": 0.9004726125991197,
   "val_pr_auc": 0.9087108841153898,
   "operating_thresholds": {
-    "legitimate_upper_bound": 0.15,
-    "unknown_abstain_upper_bound": 0.4,
-    "spam_upper_bound": 0.7,
-    "scam_lower_bound": 0.7
+    "legitimate_upper_bound": 0.1,
+    "unknown_abstain_upper_bound": 0.6,
+    "spam_upper_bound": 0.98,
+    "scam_lower_bound": 0.98
   }
 }
