@@ -4,7 +4,7 @@ import java.util.*;
 public class JvmPhoneNumberExtractor {
 
     private static final Set<String> WANGIRI_PREFIXES = new HashSet<>(Arrays.asList(
-        "881", "882", "883", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870", "871", "872", "873"
+        "881", "882", "883", "247", "870", "871", "872", "873", "239", "245", "674", "688"
     ));
 
     private static final Set<String> EMERGENCY_SHORTCODES = new HashSet<>(Arrays.asList(
@@ -14,7 +14,6 @@ public class JvmPhoneNumberExtractor {
     private static final List<String> TELEMARKETING_PREFIXES = Arrays.asList(
         "^\\+?91140\\d{7}$",
         "^\\+?4484[345]\\d{7}$",
-        "^\\+?1(844|855|866)\\d{7}$",
         "^\\+?3389\\d{7}$"
     );
 
@@ -46,75 +45,56 @@ public class JvmPhoneNumberExtractor {
             stdLength = onlyDigits.length();
             isValid = true;
         } else {
-            boolean isWangiriPrefix = false;
-            for (String wp : WANGIRI_PREFIXES) {
-                if (cleaned.startsWith("+" + wp) || onlyDigits.startsWith(wp)) {
-                    countryCodeStr = wp;
-                    natNumStr = onlyDigits.length() > wp.length() ? onlyDigits.substring(wp.length()) : onlyDigits;
-                    stdLength = 10;
-                    isValid = true;
-                    isWangiriPrefix = true;
-                    break;
-                }
-            }
-
-            if (!isWangiriPrefix) {
-                if (cleaned.startsWith("+91") || (defaultCountry.equals("IN") && onlyDigits.length() >= 10)) {
-                    countryCodeStr = "91";
-                    natNumStr = cleaned.startsWith("+91") || (onlyDigits.startsWith("91") && onlyDigits.length() == 12) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
-                    stdLength = 10;
-                    isValid = true;
-                } else if (cleaned.startsWith("+1") || (defaultCountry.equals("US") && onlyDigits.length() == 10)) {
-                    countryCodeStr = "1";
-                    natNumStr = cleaned.startsWith("+1") || (onlyDigits.startsWith("1") && onlyDigits.length() == 11) ? onlyDigits.substring(1) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
-                    stdLength = 10;
-                    isValid = true;
-                } else if (cleaned.startsWith("+44") || defaultCountry.equals("GB")) {
-                    countryCodeStr = "44";
-                    natNumStr = cleaned.startsWith("+44") || (onlyDigits.startsWith("44") && onlyDigits.length() == 12) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
-                    stdLength = 10;
-                    isValid = true;
-                } else if (cleaned.startsWith("+33") || defaultCountry.equals("FR")) {
-                    countryCodeStr = "33";
-                    natNumStr = cleaned.startsWith("+33") || (onlyDigits.startsWith("33") && onlyDigits.length() >= 10) ? onlyDigits.substring(2) : (onlyDigits.length() >= 9 ? onlyDigits.substring(onlyDigits.length() - 9) : onlyDigits);
-                    stdLength = 9;
-                    isValid = true;
-                } else if (cleaned.startsWith("+49") || defaultCountry.equals("DE")) {
-                    countryCodeStr = "49";
-                    natNumStr = cleaned.startsWith("+49") || (onlyDigits.startsWith("49") && onlyDigits.length() >= 11) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
-                    stdLength = 10;
-                    isValid = true;
-                } else if (cleaned.startsWith("+61") || defaultCountry.equals("AU")) {
-                    countryCodeStr = "61";
-                    natNumStr = cleaned.startsWith("+61") || (onlyDigits.startsWith("61") && onlyDigits.length() >= 10) ? onlyDigits.substring(2) : (onlyDigits.length() >= 9 ? onlyDigits.substring(onlyDigits.length() - 9) : onlyDigits);
-                    stdLength = 9;
-                    isValid = true;
-                } else if (cleaned.startsWith("+81") || defaultCountry.equals("JP")) {
-                    countryCodeStr = "81";
-                    natNumStr = cleaned.startsWith("+81") || (onlyDigits.startsWith("81") && onlyDigits.length() >= 11) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
-                    stdLength = 10;
-                    isValid = true;
-                } else if (cleaned.startsWith("+55") || defaultCountry.equals("BR")) {
-                    countryCodeStr = "55";
-                    natNumStr = cleaned.startsWith("+55") || (onlyDigits.startsWith("55") && onlyDigits.length() >= 12) ? onlyDigits.substring(2) : (onlyDigits.length() >= 11 ? onlyDigits.substring(onlyDigits.length() - 11) : onlyDigits);
-                    stdLength = 11;
-                    isValid = true;
-                } else if (cleaned.startsWith("+62") || defaultCountry.equals("ID")) {
-                    countryCodeStr = "62";
-                    natNumStr = cleaned.startsWith("+62") || (onlyDigits.startsWith("62") && onlyDigits.length() >= 11) ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
-                    stdLength = 10;
-                    isValid = true;
-                } else if (cleaned.startsWith("+234") || defaultCountry.equals("NG")) {
-                    countryCodeStr = "234";
-                    natNumStr = cleaned.startsWith("+234") || (onlyDigits.startsWith("234") && onlyDigits.length() >= 13) ? onlyDigits.substring(3) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
-                    stdLength = 10;
-                    isValid = true;
-                } else {
-                    countryCodeStr = onlyDigits.length() >= 3 ? onlyDigits.substring(0, 3) : onlyDigits;
-                    natNumStr = onlyDigits.length() > 3 ? onlyDigits.substring(3) : onlyDigits;
-                    stdLength = 10;
-                    isValid = (onlyDigits.length() >= 7 && onlyDigits.length() <= 15);
-                }
+            if (cleaned.startsWith("+91") || (defaultCountry.equals("IN") && onlyDigits.length() == 10)) {
+                countryCodeStr = "91";
+                natNumStr = cleaned.startsWith("+91") ? onlyDigits.substring(2) : onlyDigits;
+                stdLength = 10;
+                isValid = natNumStr.length() == 10;
+            } else if (cleaned.startsWith("+1") || (defaultCountry.equals("US") && onlyDigits.length() == 10)) {
+                countryCodeStr = "1";
+                natNumStr = cleaned.startsWith("+1") ? onlyDigits.substring(1) : onlyDigits;
+                stdLength = 10;
+                isValid = natNumStr.length() == 10;
+            } else if (cleaned.startsWith("+44") || defaultCountry.equals("GB")) {
+                countryCodeStr = "44";
+                natNumStr = cleaned.startsWith("+44") ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                stdLength = 10;
+                isValid = natNumStr.length() == 10;
+            } else if (cleaned.startsWith("+33") || defaultCountry.equals("FR")) {
+                countryCodeStr = "33";
+                natNumStr = cleaned.startsWith("+33") ? onlyDigits.substring(2) : (onlyDigits.length() >= 9 ? onlyDigits.substring(onlyDigits.length() - 9) : onlyDigits);
+                stdLength = 9;
+                isValid = natNumStr.length() == 9;
+            } else if (cleaned.startsWith("+49") || defaultCountry.equals("DE")) {
+                countryCodeStr = "49";
+                natNumStr = cleaned.startsWith("+49") ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                stdLength = 10;
+                isValid = natNumStr.length() >= 10 && natNumStr.length() <= 11;
+            } else if (cleaned.startsWith("+61") || defaultCountry.equals("AU")) {
+                countryCodeStr = "61";
+                natNumStr = cleaned.startsWith("+61") ? onlyDigits.substring(2) : (onlyDigits.length() >= 9 ? onlyDigits.substring(onlyDigits.length() - 9) : onlyDigits);
+                stdLength = 9;
+                isValid = natNumStr.length() == 9;
+            } else if (cleaned.startsWith("+81") || defaultCountry.equals("JP")) {
+                countryCodeStr = "81";
+                natNumStr = cleaned.startsWith("+81") ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                stdLength = 10;
+                isValid = natNumStr.length() == 10;
+            } else if (cleaned.startsWith("+55") || defaultCountry.equals("BR")) {
+                countryCodeStr = "55";
+                natNumStr = cleaned.startsWith("+55") ? onlyDigits.substring(2) : (onlyDigits.length() >= 11 ? onlyDigits.substring(onlyDigits.length() - 11) : onlyDigits);
+                stdLength = 11;
+                isValid = natNumStr.length() == 11;
+            } else if (cleaned.startsWith("+62") || defaultCountry.equals("ID")) {
+                countryCodeStr = "62";
+                natNumStr = cleaned.startsWith("+62") ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                stdLength = 10;
+                isValid = natNumStr.length() >= 10 && natNumStr.length() <= 12;
+            } else if (cleaned.startsWith("+234") || defaultCountry.equals("NG")) {
+                countryCodeStr = "234";
+                natNumStr = cleaned.startsWith("+234") ? onlyDigits.substring(3) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                stdLength = 10;
+                isValid = natNumStr.length() == 10;
             }
         }
 
@@ -241,12 +221,13 @@ public class JvmPhoneNumberExtractor {
                               (defaultCountry.equals("JP") && countryCodeStr.equals("81")) ||
                               (defaultCountry.equals("BR") && countryCodeStr.equals("55")) ||
                               (defaultCountry.equals("ID") && countryCodeStr.equals("62")) ||
-                              (defaultCountry.equals("NG") && countryCodeStr.equals("234"));
+                              (defaultCountry.equals("NG") && countryCodeStr.equals("234")) ||
+                              (defaultCountry.equals("SO") && countryCodeStr.equals("252"));
         vec[26] = sameCountry ? 1.0f : 0.0f;
 
         // 27. Country risk tier
         if (isWangiri) vec[27] = 1.0f;
-        else if (countryCodeStr.equals("91") || countryCodeStr.equals("1") || countryCodeStr.equals("44") || countryCodeStr.equals("61") || countryCodeStr.equals("49") || countryCodeStr.equals("33") || countryCodeStr.equals("81") || countryCodeStr.equals("55") || countryCodeStr.equals("62") || countryCodeStr.equals("234")) vec[27] = 0.10f;
+        else if (countryCodeStr.equals("91") || countryCodeStr.equals("1") || countryCodeStr.equals("44") || countryCodeStr.equals("61") || countryCodeStr.equals("49") || countryCodeStr.equals("33") || countryCodeStr.equals("81") || countryCodeStr.equals("55") || countryCodeStr.equals("62") || countryCodeStr.equals("234") || countryCodeStr.equals("252")) vec[27] = 0.10f;
         else vec[27] = 0.40f;
 
         // 28. Joint: Wangiri Trap

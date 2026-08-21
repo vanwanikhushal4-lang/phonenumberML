@@ -19,7 +19,7 @@ public class JvmPhoneNumberEvaluator {
     static final PhoneNumberUtil phoneUtil = PhoneNumberUtil.getInstance();
 
     static final Set<String> WANGIRI_PREFIXES = new HashSet<>(Arrays.asList(
-            "881", "882", "883", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870", "871", "872", "873"
+            "881", "882", "883", "247", "870", "871", "872", "873", "239", "245", "674", "688"
     ));
 
     static final Set<String> EMERGENCY_SHORTCODES = new HashSet<>(Arrays.asList(
@@ -29,7 +29,6 @@ public class JvmPhoneNumberEvaluator {
     static final List<Pattern> TELEMARKETING_PATTERNS = Arrays.asList(
             Pattern.compile("^\\+?91140\\d{7}$"),
             Pattern.compile("^\\+?44(84[345]|87[01])\\d{7}$"),
-            Pattern.compile("^\\+?1(833|844|855|866|877|888)\\d{7}$"),
             Pattern.compile("^\\+?3389\\d{7}$")
     );
 
@@ -165,24 +164,6 @@ public class JvmPhoneNumberEvaluator {
             return r;
         }
 
-        for (String wp : WANGIRI_PREFIXES) {
-            if (cleaned.startsWith("+" + wp) || onlyDigits.startsWith(wp)) {
-                String nat = onlyDigits.length() > wp.length() ? onlyDigits.substring(wp.length()) : onlyDigits;
-                r.e164 = "+" + wp + nat;
-                r.countryCode = wp;
-                r.nationalNumber = nat;
-                r.stdLength = 10;
-                r.isValid = true;
-                try {
-                    PhoneNumber parsed = phoneUtil.parse(r.e164, defaultCountry);
-                    r.type = phoneUtil.getNumberType(parsed);
-                } catch (Exception e) {
-                    r.type = PhoneNumberType.UNKNOWN;
-                }
-                return r;
-            }
-        }
-
         try {
             PhoneNumber parsed = phoneUtil.parse(rawClean, defaultCountry);
             r.isValid = phoneUtil.isValidNumber(parsed);
@@ -196,15 +177,15 @@ public class JvmPhoneNumberEvaluator {
             else r.stdLength = 10;
             return r;
         } catch (Exception e) {
-            if (cleaned.startsWith("+91") || (defaultCountry.equals("IN") && onlyDigits.length() >= 10)) {
+            if (cleaned.startsWith("+91") || (defaultCountry.equals("IN") && onlyDigits.length() == 10)) {
                 r.countryCode = "91";
-                r.nationalNumber = cleaned.startsWith("+91") ? onlyDigits.substring(2) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                r.nationalNumber = cleaned.startsWith("+91") ? onlyDigits.substring(2) : onlyDigits;
                 r.e164 = "+91" + r.nationalNumber;
                 r.isValid = r.nationalNumber.length() == 10;
                 r.type = PhoneNumberType.MOBILE;
             } else if (cleaned.startsWith("+1") || (defaultCountry.equals("US") && onlyDigits.length() == 10)) {
                 r.countryCode = "1";
-                r.nationalNumber = cleaned.startsWith("+1") ? onlyDigits.substring(1) : (onlyDigits.length() >= 10 ? onlyDigits.substring(onlyDigits.length() - 10) : onlyDigits);
+                r.nationalNumber = cleaned.startsWith("+1") ? onlyDigits.substring(1) : onlyDigits;
                 r.e164 = "+1" + r.nationalNumber;
                 r.isValid = r.nationalNumber.length() == 10;
                 r.type = PhoneNumberType.FIXED_LINE_OR_MOBILE;
@@ -212,7 +193,8 @@ public class JvmPhoneNumberEvaluator {
                 r.e164 = cleaned.startsWith("+") ? cleaned : ("+" + onlyDigits);
                 r.countryCode = onlyDigits.length() >= 3 ? onlyDigits.substring(0, 3) : onlyDigits;
                 r.nationalNumber = onlyDigits.length() > 3 ? onlyDigits.substring(3) : onlyDigits;
-                r.isValid = onlyDigits.length() >= 7 && onlyDigits.length() <= 15;
+                r.isValid = false;
+                r.type = PhoneNumberType.UNKNOWN;
             }
             return r;
         }
@@ -352,12 +334,13 @@ public class JvmPhoneNumberEvaluator {
                 (defaultCountry.equals("JP") && countryCodeStr.equals("81")) ||
                 (defaultCountry.equals("BR") && countryCodeStr.equals("55")) ||
                 (defaultCountry.equals("ID") && countryCodeStr.equals("62")) ||
-                (defaultCountry.equals("NG") && countryCodeStr.equals("234"));
+                (defaultCountry.equals("NG") && countryCodeStr.equals("234")) ||
+                (defaultCountry.equals("SO") && countryCodeStr.equals("252"));
         vec[26] = sameCountry ? 1.0 : 0.0;
 
         // 27. geo_country_risk_tier
         if (isWangiri) vec[27] = 1.0;
-        else if (Arrays.asList("91", "1", "44", "61", "49", "33", "81", "55", "62", "234").contains(countryCodeStr)) vec[27] = 0.10;
+        else if (Arrays.asList("91", "1", "44", "61", "49", "33", "81", "55", "62", "234", "252").contains(countryCodeStr)) vec[27] = 0.10;
         else vec[27] = 0.40;
 
         // 28. joint_wangiri_callback_trap

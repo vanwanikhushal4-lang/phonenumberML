@@ -1,4 +1,4 @@
-﻿"""
+"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2)
 Deterministic Privacy-Preserving Feature Extractor (36 Features)
 Direct Integration with Google libphonenumber & Per-Instance Explainability
@@ -21,14 +21,13 @@ with open(SPEC_PATH, "r", encoding="utf-8-sig") as f:
 
 # High-Risk Wangiri & Revenue Sharing International Country / Area Codes
 WANGIRI_PREFIXES = {
-    "881", "882", "883", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870", "871", "872", "873"
+    "881", "882", "883", "247", "870", "871", "872", "873", "239", "245", "674", "688"
 }
 
-# Registered Commercial Telemarketing Series (e.g. India TRAI 140, UK 0843, US 844/855/866 marketing, France 089)
+# Registered Commercial Telemarketing Series (e.g. India TRAI 140, UK 0843, France 089)
 TELEMARKETING_PREFIXES = [
     r"^\+?91140\d{7}$",
     r"^\+?44(84[345]|87[01])\d{7}$",
-    r"^\+?1(833|844|855|866|877|888)\d{7}$",
     r"^\+?3389\d{7}$",
 ]
 
@@ -129,11 +128,6 @@ def normalize_and_parse(raw_number: str, default_country: str = "IN") -> Tuple[s
         cc = "91" if default_country == "IN" else ("1" if default_country == "US" else "44")
         return raw_clean, cc, only_digits, 10, False
 
-    for wp in WANGIRI_PREFIXES:
-        if cleaned.startswith(f"+{wp}") or only_digits.startswith(wp):
-            nat = only_digits[len(wp):] if len(only_digits) > len(wp) else only_digits
-            return f"+{wp}{nat}", wp, nat, 10, True
-
     try:
         parsed = phonenumbers.parse(raw_clean, default_country)
         is_v = phonenumbers.is_valid_number(parsed)
@@ -145,20 +139,20 @@ def normalize_and_parse(raw_number: str, default_country: str = "IN") -> Tuple[s
         elif cc in ("55",): std_len = 11
         return e164, cc, nat, std_len, is_v
     except Exception:
-        # Fallback deterministic parser
-        if cleaned.startswith("+91") or (default_country == "IN" and len(only_digits) >= 10):
+        # Fallback deterministic parser for edge cases
+        if cleaned.startswith("+91") or (default_country == "IN" and len(only_digits) == 10):
             cc = "91"
-            nat = only_digits[2:] if cleaned.startswith("+91") or (only_digits.startswith("91") and len(only_digits) >= 12) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
-            is_v = (10 <= len(nat) <= 11)
+            nat = only_digits[2:] if cleaned.startswith("+91") else only_digits
+            is_v = (len(nat) == 10)
             return f"+91{nat}", cc, nat, 10, is_v
         elif cleaned.startswith("+1") or (default_country == "US" and len(only_digits) == 10):
             cc = "1"
-            nat = only_digits[1:] if cleaned.startswith("+1") or (only_digits.startswith("1") and len(only_digits) == 11) else (only_digits[-10:] if len(only_digits) >= 10 else only_digits)
+            nat = only_digits[1:] if cleaned.startswith("+1") else only_digits
             return f"+1{nat}", cc, nat, 10, (len(nat) == 10)
         else:
             cc = only_digits[:3] if len(only_digits) >= 3 else only_digits
             nat = only_digits[3:] if len(only_digits) > 3 else only_digits
-            return f"+{cc}{nat}", cc, nat, 10, (7 <= len(only_digits) <= 15)
+            return f"+{cc}{nat}", cc, nat, 10, False
 
 def extract_features_from_number(raw_number: str, default_country: str = "IN") -> np.ndarray:
     vec = np.zeros(FEATURE_SPEC["num_features"], dtype=np.float32)
@@ -273,12 +267,13 @@ def extract_features_from_number(raw_number: str, default_country: str = "IN") -
                    (default_country == "JP" and country_code_str == "81") or \
                    (default_country == "BR" and country_code_str == "55") or \
                    (default_country == "ID" and country_code_str == "62") or \
-                   (default_country == "NG" and country_code_str == "234")
+                   (default_country == "NG" and country_code_str == "234") or \
+                   (default_country == "SO" and country_code_str == "252")
     vec[26] = 1.0 if same_country else 0.0
 
     # 27. Country risk tier
     if is_wangiri: vec[27] = 1.0
-    elif country_code_str in ("91", "1", "44", "61", "49", "33", "81", "55", "62", "234"): vec[27] = 0.10
+    elif country_code_str in ("91", "1", "44", "61", "49", "33", "81", "55", "62", "234", "252"): vec[27] = 0.10
     else: vec[27] = 0.40
 
     # 28. Joint: Wangiri Callback Trap

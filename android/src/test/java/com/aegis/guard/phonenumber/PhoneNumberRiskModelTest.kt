@@ -32,7 +32,7 @@ class PhoneNumberRiskModelTest {
     }
 
     @Test
-    fun testAll20GoldenVectorsMatchExactExpectedOutcomes() {
+    fun testAll21GoldenVectorsMatchExactExpectedOutcomes() {
         val goldenCandidates = listOf(
             File("ml/export/golden_test_vectors.json"),
             File("../../ml/export/golden_test_vectors.json"),
@@ -43,7 +43,7 @@ class PhoneNumberRiskModelTest {
 
         val goldenJson = JSONObject(goldenFile!!.readText())
         val testCases = goldenJson.getJSONArray("test_cases")
-        assertEquals(20, testCases.length())
+        assertEquals(21, testCases.length())
 
         for (i in 0 until testCases.length()) {
             val caseObj = testCases.getJSONObject(i)
@@ -89,5 +89,32 @@ class PhoneNumberRiskModelTest {
             "trees": []
         }"""
         assertFalse("Invalid feature count must fail AST validation", invalidModel.loadModelFromJsonString(badAstJson))
+    }
+
+    @Test
+    fun testModelTamperingThresholdModificationFailsClosed() {
+        val candidates = listOf(
+            File("src/main/assets/phonenumber_risk_model.json"),
+            File("android/src/main/assets/phonenumber_risk_model.json"),
+            File("../android/src/main/assets/phonenumber_risk_model.json"),
+            File("ml/export/phonenumber_risk_model.json"),
+            File("../../ml/export/phonenumber_risk_model.json")
+        )
+        val modelFile = candidates.find { it.exists() }
+        assertNotNull("phonenumber_risk_model.json asset must exist", modelFile)
+        val validJsonStr = modelFile!!.readText()
+
+        // Tamper a single threshold in the JSON while retaining original sha256_checksum
+        val tamperedJsonStr = validJsonStr.replaceFirst("\"threshold\": 0.", "\"threshold\": 0.99999999")
+        assertNotEquals("JSON must be modified for tampering test", validJsonStr, tamperedJsonStr)
+
+        val tamperModel = PhoneNumberRiskModel()
+        val loaded = tamperModel.loadModelFromJsonString(tamperedJsonStr)
+        assertFalse("Tampered tree thresholds must fail SHA-256 integrity verification and fail closed", loaded)
+
+        // Verify fail-closed behavior on evaluation
+        val assessment = tamperModel.assessNumber("+919820481729", "IN")
+        assertTrue("Unloaded/tampered model must safely abstain", assessment.isAbstain)
+        assertEquals(ThreatTier.UNKNOWN, assessment.threatTier)
     }
 }

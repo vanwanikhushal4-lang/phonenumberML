@@ -22,7 +22,7 @@ class PhoneNumberFeatureExtractor(
     companion object {
         private val WANGIRI_PREFIXES = HashSet(
             Arrays.asList(
-                "881", "882", "883", "247", "232", "252", "224", "255", "257", "269", "239", "245", "674", "688", "870", "871", "872", "873"
+                "881", "882", "883", "247", "870", "871", "872", "873", "239", "245", "674", "688"
             )
         )
 
@@ -33,7 +33,6 @@ class PhoneNumberFeatureExtractor(
         private val TELEMARKETING_PATTERNS = listOf(
             Pattern.compile("^\\+?91140\\d{7}$"),
             Pattern.compile("^\\+?44(84[345]|87[01])\\d{7}$"),
-            Pattern.compile("^\\+?1(833|844|855|866|877|888)\\d{7}$"),
             Pattern.compile("^\\+?3389\\d{7}$")
         )
 
@@ -79,19 +78,6 @@ class PhoneNumberFeatureExtractor(
             return NormalizedParse(rawClean, cc, onlyDigits, 10, false)
         }
 
-        for (wp in WANGIRI_PREFIXES) {
-            if (cleaned.startsWith("+$wp") || onlyDigits.startsWith(wp)) {
-                val nat = if (onlyDigits.length > wp.length) onlyDigits.substring(wp.length) else onlyDigits
-                val e164 = "+$wp$nat"
-                var parsedType = PhoneNumberType.UNKNOWN
-                try {
-                    val parsed = phoneUtil.parse(e164, defaultCountry)
-                    parsedType = phoneUtil.getNumberType(parsed)
-                } catch (ignored: Exception) {}
-                return NormalizedParse(e164, wp, nat, 10, true, parsedType)
-            }
-        }
-
         return try {
             val parsed: PhoneNumber = phoneUtil.parse(rawClean, defaultCountry)
             val isValid = phoneUtil.isValidNumber(parsed)
@@ -106,19 +92,19 @@ class PhoneNumberFeatureExtractor(
             }
             NormalizedParse(e164, cc, nat, stdLen, isValid, type)
         } catch (e: Exception) {
-            if (cleaned.startsWith("+91") || (defaultCountry == "IN" && onlyDigits.length >= 10)) {
+            if (cleaned.startsWith("+91") || (defaultCountry == "IN" && onlyDigits.length == 10)) {
                 val cc = "91"
-                val nat = if (cleaned.startsWith("+91")) onlyDigits.substring(2) else if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits
+                val nat = if (cleaned.startsWith("+91")) onlyDigits.substring(2) else onlyDigits
                 NormalizedParse("+91$nat", cc, nat, 10, nat.length == 10, PhoneNumberType.MOBILE)
             } else if (cleaned.startsWith("+1") || (defaultCountry == "US" && onlyDigits.length == 10)) {
                 val cc = "1"
-                val nat = if (cleaned.startsWith("+1")) onlyDigits.substring(1) else if (onlyDigits.length >= 10) onlyDigits.substring(onlyDigits.length - 10) else onlyDigits
+                val nat = if (cleaned.startsWith("+1")) onlyDigits.substring(1) else onlyDigits
                 NormalizedParse("+1$nat", cc, nat, 10, nat.length == 10, PhoneNumberType.FIXED_LINE_OR_MOBILE)
             } else {
                 val e164 = if (cleaned.startsWith("+")) cleaned else "+$onlyDigits"
                 val cc = if (onlyDigits.length >= 3) onlyDigits.substring(0, 3) else onlyDigits
                 val nat = if (onlyDigits.length > 3) onlyDigits.substring(3) else onlyDigits
-                NormalizedParse(e164, cc, nat, 10, onlyDigits.length in 7..15, PhoneNumberType.UNKNOWN)
+                NormalizedParse(e164, cc, nat, 10, false, PhoneNumberType.UNKNOWN)
             }
         }
     }
@@ -253,13 +239,14 @@ class PhoneNumberFeatureExtractor(
                 (defaultCountry == "JP" && countryCodeStr == "81") ||
                 (defaultCountry == "BR" && countryCodeStr == "55") ||
                 (defaultCountry == "ID" && countryCodeStr == "62") ||
-                (defaultCountry == "NG" && countryCodeStr == "234")
+                (defaultCountry == "NG" && countryCodeStr == "234") ||
+                (defaultCountry == "SO" && countryCodeStr == "252")
         vec[26] = if (sameCountry) 1.0 else 0.0
 
         // 27. geo_country_risk_tier
         vec[27] = when {
             isWangiri -> 1.0
-            listOf("91", "1", "44", "61", "49", "33", "81", "55", "62", "234").contains(countryCodeStr) -> 0.10
+            listOf("91", "1", "44", "61", "49", "33", "81", "55", "62", "234", "252").contains(countryCodeStr) -> 0.10
             else -> 0.40
         }
 

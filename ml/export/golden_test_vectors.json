@@ -91,6 +91,22 @@
       "category": "Cellular Subscriber"
     },
     {
+      "case_id": "us_tollfree_844_legitimate",
+      "raw_number": "+18445550100",
+      "country": "US",
+      "expected_tier": "UNKNOWN",
+      "expected_is_threat": false,
+      "category": "NANPA Toll-Free Customer Line"
+    },
+    {
+      "case_id": "somalia_standard_mobile",
+      "raw_number": "+252615551234",
+      "country": "SO",
+      "expected_tier": "UNKNOWN",
+      "expected_is_threat": false,
+      "category": "Standard Foreign Cellular Line"
+    },
+    {
       "case_id": "trai_140_telemarketer",
       "raw_number": "+911409988776",
       "country": "IN",
@@ -107,14 +123,6 @@
       "category": "OFCOM Bulk Series"
     },
     {
-      "case_id": "us_tollfree_marketing",
-      "raw_number": "+18445551212",
-      "country": "US",
-      "expected_tier": "SPAM",
-      "expected_is_threat": true,
-      "category": "NANPA 844 Marketing"
-    },
-    {
       "case_id": "low_entropy_dialer_all_repeats",
       "raw_number": "+917777777777",
       "country": "IN",
@@ -129,14 +137,6 @@
       "expected_tier": "SCAM",
       "expected_is_threat": true,
       "category": "Wangiri Satellite Trap"
-    },
-    {
-      "case_id": "wangiri_somalia_trap",
-      "raw_number": "+25270112233",
-      "country": "IN",
-      "expected_tier": "SCAM",
-      "expected_is_threat": true,
-      "category": "Wangiri High-Cost Trap"
     },
     {
       "case_id": "premium_rate_scam_us",
@@ -161,6 +161,14 @@
       "expected_tier": "INVALID",
       "expected_is_threat": false,
       "category": "Length Below Minimum"
+    },
+    {
+      "case_id": "invalid_malformed_somalia_fragment",
+      "raw_number": "+2521",
+      "country": "IN",
+      "expected_tier": "INVALID",
+      "expected_is_threat": false,
+      "category": "Malformed Truncated Dial String"
     }
   ]
 }

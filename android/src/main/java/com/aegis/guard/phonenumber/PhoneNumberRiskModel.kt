@@ -3,18 +3,11 @@ package com.aegis.guard.phonenumber
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
+import java.util.Locale
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-
-enum class ThreatTier {
-    LEGITIMATE,
-    UNKNOWN,
-    SPAM,
-    SCAM,
-    INVALID
-}
 
 data class PhoneRiskAssessment(
     val rawNumber: String,
@@ -27,7 +20,10 @@ data class PhoneRiskAssessment(
     val riskScore: Int,
     val rawLogit: Double,
     val calibratedProbability: Double,
-    val confidence: String
+    val confidence: String,
+    val topReasonCodes: List<String> = emptyList(),
+    val topExplanations: List<String> = emptyList(),
+    val evaluationLatencyMs: Double = 0.0
 ) {
     val tier: ThreatTier get() = threatTier
 }
@@ -121,16 +117,20 @@ class PhoneNumberRiskModel(
 
             // 5. Verify SHA-256 Checksum
             expectedChecksum = root.optString("sha256_checksum", "")
-            if (expectedChecksum.isNotEmpty()) {
-                if (expectedChecksum.length != 64) return false
+            if (expectedChecksum.length != 64) {
+                return false
             }
 
+            val sb = StringBuilder()
             val parsedTrees = ArrayList<DecisionTree>()
             for (i in 0 until treesArray.length()) {
                 val treeObj = treesArray.getJSONObject(i)
+                val treeId = treeObj.getInt("tree_id")
                 val nodesArray = treeObj.getJSONArray("nodes")
                 val numNodes = nodesArray.length()
                 if (numNodes < 1) return false
+
+                sb.append("T:").append(treeId).append(":").append(numNodes).append("\n")
 
                 val nodesList = ArrayList<DecisionNode>()
                 for (j in 0 until numNodes) {
@@ -142,6 +142,7 @@ class PhoneNumberRiskModel(
                     if (isLeaf) {
                         val leafVal = nObj.getDouble("leaf_value")
                         if (leafVal.isNaN() || leafVal.isInfinite()) return false
+                        sb.append("L:").append(nodeId).append(":").append(String.format(Locale.US, "%.8f", leafVal)).append("\n")
                         nodesList.add(DecisionNode(isLeaf = true, leafValue = leafVal))
                     } else {
                         val featIdx = nObj.getInt("feature_idx")
@@ -153,6 +154,12 @@ class PhoneNumberRiskModel(
                         val left = nObj.getInt("left_child")
                         val right = nObj.getInt("right_child")
                         if (left < 0 || left >= numNodes || right < 0 || right >= numNodes) return false
+
+                        sb.append("N:").append(nodeId).append(":")
+                            .append(featIdx).append(":")
+                            .append(String.format(Locale.US, "%.8f", th)).append(":")
+                            .append(left).append(":")
+                            .append(right).append("\n")
 
                         nodesList.add(
                             DecisionNode(
@@ -168,6 +175,16 @@ class PhoneNumberRiskModel(
                 parsedTrees.add(DecisionTree(nodesList))
             }
 
+            // Verify exact constant-time SHA-256 tree integrity
+            val canonicalBytes = sb.toString().trimEnd().toByteArray(Charsets.UTF_8)
+            val computedDigest = MessageDigest.getInstance("SHA-256").digest(canonicalBytes)
+            val computedHex = computedDigest.joinToString("") { "%02x".format(it) }
+            if (!MessageDigest.isEqual(computedHex.toByteArray(Charsets.UTF_8), expectedChecksum.toByteArray(Charsets.UTF_8))) {
+                trees.clear()
+                isLoaded = false
+                return false
+            }
+
             trees.clear()
             trees.addAll(parsedTrees)
             isLoaded = true
@@ -180,10 +197,12 @@ class PhoneNumberRiskModel(
     }
 
     fun assessNumber(rawNumber: String?, defaultCountry: String = "IN"): PhoneRiskAssessment {
+        val t0 = System.nanoTime()
         val normParse = extractor.normalizeAndParse(rawNumber, defaultCountry)
         val rawClean = rawNumber ?: ""
 
         if (!normParse.isValid) {
+            val latency = (System.nanoTime() - t0) / 1_000_000.0
             return PhoneRiskAssessment(
                 rawNumber = rawClean,
                 normalizedE164 = normParse.e164,
@@ -195,11 +214,15 @@ class PhoneNumberRiskModel(
                 riskScore = 0,
                 rawLogit = 0.0,
                 calibratedProbability = 0.0,
-                confidence = "HIGH"
+                confidence = "HIGH",
+                topReasonCodes = listOf("num_is_valid_e164"),
+                topExplanations = listOf("Invalid number syntax violating standard numbering plan"),
+                evaluationLatencyMs = latency
             )
         }
 
         if (!isLoaded || trees.isEmpty()) {
+            val latency = (System.nanoTime() - t0) / 1_000_000.0
             return PhoneRiskAssessment(
                 rawNumber = rawClean,
                 normalizedE164 = normParse.e164,
@@ -211,7 +234,10 @@ class PhoneNumberRiskModel(
                 riskScore = 30,
                 rawLogit = 0.30,
                 calibratedProbability = 0.038,
-                confidence = "LOW"
+                confidence = "LOW",
+                topReasonCodes = listOf("uninitialized_model"),
+                topExplanations = listOf("Model uninitialized - default safe fallback"),
+                evaluationLatencyMs = latency
             )
         }
 
@@ -231,6 +257,39 @@ class PhoneNumberRiskModel(
             else -> Quad(ThreatTier.LEGITIMATE, "HIGH", false, false)
         }
 
+        val reasonCodes = ArrayList<String>()
+        val explanations = ArrayList<String>()
+        if (features[20] > 0.5 || features[28] > 0.5) {
+            reasonCodes.add("risk_wangiri_high_cost_prefix")
+            explanations.add("High-risk international revenue-sharing callback trap (Wangiri scam)")
+        }
+        if (features[21] > 0.5 || features[31] > 0.5) {
+            reasonCodes.add("risk_telemarketing_series")
+            explanations.add("Matches registered commercial telemarketing / automated dialer series")
+        }
+        if (features[14] > 0.5) {
+            reasonCodes.add("plan_is_premium_rate")
+            explanations.add("High-charge premium rate number service")
+        }
+        if (features[29] > 0.5 || features[5] >= 0.5 || features[6] >= 0.6 || features[7] >= 0.6) {
+            reasonCodes.add("digit_max_repeat_run")
+            explanations.add("Unnatural low-entropy repetitive or sequential digit pattern typical of automated robocallers")
+        }
+        if (features[24] > 0.5) {
+            reasonCodes.add("hard_neg_legitimate_bank_support")
+            explanations.add("Verified legitimate customer care / banking institution toll-free line")
+        }
+        if (features[25] > 0.5) {
+            reasonCodes.add("hard_neg_emergency_service")
+            explanations.add("Recognized national emergency or public service line")
+        }
+        if (reasonCodes.isEmpty()) {
+            reasonCodes.add("standard_entropy_structure")
+            explanations.add("Standard number structure. Digits alone provide insufficient evidence.")
+        }
+
+        val latency = (System.nanoTime() - t0) / 1_000_000.0
+
         return PhoneRiskAssessment(
             rawNumber = rawClean,
             normalizedE164 = normParse.e164,
@@ -242,7 +301,10 @@ class PhoneNumberRiskModel(
             riskScore = score,
             rawLogit = rawLogit,
             calibratedProbability = calProb,
-            confidence = confidence
+            confidence = confidence,
+            topReasonCodes = reasonCodes.take(3),
+            topExplanations = explanations.take(3),
+            evaluationLatencyMs = latency
         )
     }
 

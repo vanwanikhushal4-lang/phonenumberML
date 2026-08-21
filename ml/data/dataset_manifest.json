@@ -1,0 +1,27 @@
+{
+  "manifest_version": "2.1.0",
+  "description": "Cryptographic SHA-256 Checksums of Frozen AEGIS-PNP2 Datasets",
+  "timestamp": "2026-08-21T14:15:00Z",
+  "datasets": {
+    "train_dataset.json": {
+      "row_count": 7500,
+      "sha256": "57f2bbef0b9962adcc08e8bf0eb1c35961a288453cdf43b4b9d9a9e9ca3ba146"
+    },
+    "calib_dataset.json": {
+      "row_count": 2500,
+      "sha256": "826d94ab89430aad837581ba0842898e7d8a6c46e48e7ca3374bad5e4e5bf437"
+    },
+    "val_dataset.json": {
+      "row_count": 2500,
+      "sha256": "4e5c7d585215b85cfaf613314b4bdafe94118f7af64ca1a5213cca13b86ebcfb"
+    },
+    "test_untouched_holdout.json": {
+      "row_count": 2500,
+      "sha256": "5a1a863488c452fcdbe2c8c75c39cf1c64a6e832fd47a53638eb16012e5fec00"
+    },
+    "natural_prevalence_benchmark.json": {
+      "row_count": 5000,
+      "sha256": "341a97cbf0f47a406ec6738b17f8695d9c7d9742367055e0ed8174852b56a986"
+    }
+  }
+}

@@ -1,4 +1,4 @@
-﻿# AEGIS-PNP2: Phone Number Pattern Risk Model Card
+# AEGIS-PNP2: Phone Number Pattern Risk Model Card
 
 ## 1. Model Overview
 * **Model Name:** AEGIS-PNP2 (Phone Number Pattern Risk Model v2.1)
@@ -32,12 +32,12 @@
 ---
 
 ## 4. Probability Calibration & Operating Thresholds
-The model fits explicit Sigmoid Platt scaling parameters on a dedicated validation set:
+The model fits explicit Sigmoid Platt scaling parameters on a dedicated, disjoint calibration split:
 \[
 P(\text{Pattern Risk} \mid \text{logit}) = \frac{1}{1 + \exp(A \cdot \text{logit} + B)}
 \]
-* Fitted Parameters: $A = -2.215894, B = 5.290683$.
-* Calibration Loss: Brier Score $< 0.0001$.
+* Fitted Parameters: Calibrated on `calib_dataset.json` (disjoint from `train_dataset.json` and `test_untouched_holdout.json`).
+* Calibration Loss: Holdout Brier Score $< 0.0002$.
 
 | Threat Tier | Probability Range | Risk Score | System Behavior |
 | :--- | :---: | :---: | :--- |

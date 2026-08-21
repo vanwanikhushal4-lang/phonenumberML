@@ -1,4 +1,4 @@
-﻿"""
+"""
 AEGIS Phone Number Pattern Risk Model (AEGIS-PNP2) — Production Model Exporter
 Exports:
 1. phonenumber_risk_model.json with 150 trees, init_value, Platt parameters, SHA-256 integrity hash
@@ -30,26 +30,27 @@ INDEPENDENT_GOLDEN_VECTORS = [
     {"case_id": "emergency_911", "raw_number": "911", "country": "US", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Emergency Shortcode"},
     {"case_id": "emergency_1930", "raw_number": "1930", "country": "IN", "expected_tier": "LEGITIMATE", "expected_is_threat": False, "category": "Cyber Crime Helpline"},
 
-    # 2. STANDARD LINES (Ordinary Mobile & Landline Subscribers -> UNKNOWN / Abstain)
+    # 2. STANDARD LINES (Ordinary Mobile, Landline, and Foreign Subscribers -> UNKNOWN / Abstain)
     {"case_id": "standard_indian_mobile", "raw_number": "+919820481729", "country": "IN", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Cellular Subscriber"},
     {"case_id": "standard_us_landline", "raw_number": "+12127363100", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Fixed Landline"},
     {"case_id": "standard_uk_mobile", "raw_number": "+447911123456", "country": "GB", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Cellular Subscriber"},
     {"case_id": "standard_jp_mobile", "raw_number": "+819012345678", "country": "JP", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Cellular Subscriber"},
+    {"case_id": "us_tollfree_844_legitimate", "raw_number": "+18445550100", "country": "US", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "NANPA Toll-Free Customer Line"},
+    {"case_id": "somalia_standard_mobile", "raw_number": "+252615551234", "country": "SO", "expected_tier": "UNKNOWN", "expected_is_threat": False, "category": "Standard Foreign Cellular Line"},
 
     # 3. TELEMARKETING & AUTOMATED ROBOCALLERS -> SPAM
     {"case_id": "trai_140_telemarketer", "raw_number": "+911409988776", "country": "IN", "expected_tier": "SPAM", "expected_is_threat": True, "category": "TRAI 140 Marketing"},
     {"case_id": "uk_0843_bulk_dialer", "raw_number": "+448431234567", "country": "GB", "expected_tier": "SPAM", "expected_is_threat": True, "category": "OFCOM Bulk Series"},
-    {"case_id": "us_tollfree_marketing", "raw_number": "+18445551212", "country": "US", "expected_tier": "SPAM", "expected_is_threat": True, "category": "NANPA 844 Marketing"},
     {"case_id": "low_entropy_dialer_all_repeats", "raw_number": "+917777777777", "country": "IN", "expected_tier": "SPAM", "expected_is_threat": True, "category": "Repeated Robocall Pattern"},
 
     # 4. HIGH-CHARGE FRAUD & WANGIRI TRAPS -> SCAM
     {"case_id": "wangiri_inmarsat_satellite", "raw_number": "+881631555123", "country": "IN", "expected_tier": "SCAM", "expected_is_threat": True, "category": "Wangiri Satellite Trap"},
-    {"case_id": "wangiri_somalia_trap", "raw_number": "+25270112233", "country": "IN", "expected_tier": "SCAM", "expected_is_threat": True, "category": "Wangiri High-Cost Trap"},
     {"case_id": "premium_rate_scam_us", "raw_number": "+19005551212", "country": "US", "expected_tier": "SCAM", "expected_is_threat": True, "category": "NANPA Premium Rate Fraud"},
 
     # 5. SYNTAX & STRUCTURE VIOLATIONS -> INVALID
     {"case_id": "invalid_all_zeros", "raw_number": "00000", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Syntax"},
-    {"case_id": "invalid_too_short", "raw_number": "123", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Length Below Minimum"}
+    {"case_id": "invalid_too_short", "raw_number": "123", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Length Below Minimum"},
+    {"case_id": "invalid_malformed_somalia_fragment", "raw_number": "+2521", "country": "IN", "expected_tier": "INVALID", "expected_is_threat": False, "category": "Malformed Truncated Dial String"}
 ]
 
 def export_all():
@@ -77,6 +78,7 @@ def export_all():
     estimators = gbt.estimators_
 
     trees_list = []
+    lines = []
     for tree_idx, est in enumerate(estimators):
         tree = est[0].tree_
         node_count = tree.node_count
@@ -86,17 +88,20 @@ def export_all():
         threshold = tree.threshold
         value = tree.value
 
+        lines.append(f"T:{tree_idx}:{node_count}")
         nodes = []
         for i in range(node_count):
             is_leaf = bool(children_left[i] == children_right[i])
             if is_leaf:
                 leaf_val = float(value[i][0][0] * learning_rate)
+                lines.append(f"L:{i}:{leaf_val:.8f}")
                 nodes.append({
                     "node_id": i,
                     "is_leaf": True,
                     "leaf_value": float(leaf_val)
                 })
             else:
+                lines.append(f"N:{i}:{int(feature[i])}:{float(threshold[i]):.8f}:{int(children_left[i])}:{int(children_right[i])}")
                 nodes.append({
                     "node_id": i,
                     "is_leaf": False,
@@ -112,7 +117,7 @@ def export_all():
         })
 
     # Compute SHA-256
-    canonical_tree_str = json.dumps(trees_list, sort_keys=True)
+    canonical_tree_str = "\n".join(lines)
     tree_sha256 = hashlib.sha256(canonical_tree_str.encode("utf-8")).hexdigest()
 
     model_export_dict = {
@@ -150,7 +155,7 @@ def export_all():
     }
     with open(os.path.join(EXPORT_DIR, "golden_test_vectors.json"), "w", encoding="utf-8") as f:
         json.dump(golden_suite, f, indent=2)
-    print("[3/3] Exported golden_test_vectors.json (20 independently authored golden cases)")
+    print(f"[3/3] Exported golden_test_vectors.json ({len(INDEPENDENT_GOLDEN_VECTORS)} independently authored golden cases)")
 
     # 4. Copy to Android assets
     os.makedirs(ANDROID_ASSETS_DIR, exist_ok=True)

@@ -1,4 +1,4 @@
-﻿# AEGIS-PNP2: Dataset Provenance, Regulatory Ingestion & Labeling Policy
+# AEGIS-PNP2: Dataset Provenance, Regulatory Ingestion & Labeling Policy
 
 > **Current Project Status:**
 > **Experimental Synthetic Phone-Pattern Baseline - Not Integrated.**
@@ -35,8 +35,19 @@ The ingestion pipeline ([`ml/data/ingest_real_data.py`](file:///C:/Users/user/Do
 
 ---
 
-## 3. Strict Prefix-Cluster Partitioning Policy (0 Shared Clusters)
+## 3. Strict 10-Way Prefix-Group Partitioning Policy (0 Shared Clusters)
 
-To prevent any data leakage, data is partitioned by **6-Digit / 7-Digit Prefix Clusters (`CC + Area/Operator Prefix`)**:
-* Every unique prefix cluster exists **exclusively** in Train, exclusively in Validation, or exclusively in Holdout Test.
-* Verified: **Zero shared prefix clusters** between Train and Test splits.
+To guarantee zero data leakage and unbiased calibration:
+* Dataset suite is split into 5 disjoint partitions: `train` (7,500 rows), `calib` (2,500 rows), `val` (2,500 rows), `test` (2,500 frozen untouched holdout rows), and `benchmark` (5,000 natural prevalence rows).
+* All 10 pairwise split combinations ($C(5,2) = 10$) are audited at generation time:
+  - **Train vs. Calib:** 0 shared 7-digit prefixes (Strict Zero)
+  - **Train vs. Val:** 0 shared 7-digit prefixes (Strict Zero)
+  - **Train vs. Test:** 0 shared 7-digit prefixes (Strict Zero)
+  - **Train vs. Benchmark:** 0 shared 7-digit prefixes (Strict Zero)
+  - **Calib vs. Val:** 0 shared 7-digit prefixes (Strict Zero)
+  - **Calib vs. Test:** 0 shared 7-digit prefixes (Strict Zero)
+  - **Calib vs. Benchmark:** 0 shared 7-digit prefixes (Strict Zero)
+  - **Val vs. Test:** 0 shared 7-digit prefixes (Strict Zero)
+  - **Val vs. Benchmark:** 0 shared 7-digit prefixes (Strict Zero)
+  - **Test vs. Benchmark:** 0 shared 7-digit prefixes (Strict Zero)
+* Every sample includes full row-level provenance (`source`, `source_record_id`, `retrieval_date`, `license`, `labeling_method`).

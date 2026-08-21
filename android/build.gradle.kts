@@ -1,10 +1,7 @@
 plugins {
-    id("com.android.library") version "8.2.2" apply false
-    id("org.jetbrains.kotlin.android") version "1.9.22" apply false
+    id("com.android.library") version "8.2.2"
+    id("org.jetbrains.kotlin.android") version "1.9.22"
 }
-
-apply(plugin = "com.android.library")
-apply(plugin = "org.jetbrains.kotlin.android")
 
 android {
     namespace = "com.aegis.guard.phonenumber"

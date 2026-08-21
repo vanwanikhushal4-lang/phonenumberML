@@ -1,18 +1,22 @@
 ﻿"""
-Automated Security, Authentication & Rate Limiting Tests for AEGIS Backend Server
+Automated Security, Authentication, Input Validation & Rate Limiting Tests for AEGIS Backend Server
 Tests:
 1. Missing Authentication (401 Unauthorized)
 2. Invalid Authentication (401 Unauthorized)
 3. Valid Authentication (200 OK)
-4. In-memory Rate Limiting (429 Too Many Requests after 120 calls)
-5. Pattern assessment with valid & invalid dial strings
-6. Structured IPQS proxy UNAVAILABLE handling
+4. Input Payload Validation (422 Unprocessable Entity for oversized/malformed payloads)
+5. In-memory Rate Limiting (429 Too Many Requests after 120 calls)
+6. Pattern assessment with valid & invalid dial strings
+7. Structured IPQS proxy UNAVAILABLE handling without secret leakage
 """
 
 import os
 import sys
 import unittest
 from fastapi.testclient import TestClient
+
+os.environ["AEGIS_TEST_MODE"] = "1"
+os.environ["AEGIS_SERVER_API_KEY"] = "aegis-production-hardened-strong-key-2026-xyz9876543210"
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 from ml.api.server import app, AEGIS_SERVER_API_KEY, RATE_LIMIT_BUCKET
@@ -54,6 +58,23 @@ class ApiServerSecurityTests(unittest.TestCase):
         self.assertEqual(resp.status_code, 401)
         self.assertIn("Invalid or missing X-AEGIS-API-KEY header", resp.json()["detail"])
 
+    def test_input_payload_bounds_validation_returns_422(self):
+        # Oversized number (> 30 chars)
+        resp_too_long = self.client.post(
+            "/assess/number",
+            json={"raw_number": "+91" + "9" * 40, "default_country": "IN"},
+            headers=self.valid_headers
+        )
+        self.assertEqual(resp_too_long.status_code, 422)
+
+        # Invalid country code (> 2 chars or non-alpha)
+        resp_bad_cc = self.client.post(
+            "/assess/number",
+            json={"raw_number": "+919820481729", "default_country": "IND"},
+            headers=self.valid_headers
+        )
+        self.assertEqual(resp_bad_cc.status_code, 422)
+
     def test_assessment_valid_telemarketer(self):
         resp = self.client.post(
             "/assess/number",
@@ -82,7 +103,6 @@ class ApiServerSecurityTests(unittest.TestCase):
         self.assertEqual(data["pattern_risk_score"], 0)
 
     def test_rate_limiting_enforcement(self):
-        # 120 allowed requests
         for _ in range(120):
             resp = self.client.post(
                 "/assess/number",
