@@ -4,36 +4,39 @@
 
 | Field | Value |
 | --- | --- |
+| Reviewer owner | `Codex automated reviewer` |
 | Review status | `CHANGES_REQUIRED` |
 | Reviewed branch | `main` |
-| Reviewed commit | `c2e106ffc3a68409a5783944c632a75648990de8` |
-| Candidate response branch | `codex/phone-ml-review` |
-| Candidate response commit | `f8a2eb118ef86c3f1e1b531d17f1d5f327c94502` |
-| Team response | `ANSWER.md` |
-| Re-review date | `2026-08-21` |
+| Reviewed commit | `1a70cf57cec88beef54cda342bd5d7383f333cce` |
+| Review date | `2026-08-21` |
+| Reviewer branch | `codex/phone-ml-review` |
+| Team response | `ANSWER.md` at `1a70cf57cec88beef54cda342bd5d7383f333cce` |
+| Handoff PR | `#1` was merged unexpectedly and is no longer a valid draft handoff |
 
-## Re-Review Verdict
+## Readiness Verdict
 
-`ANSWER.md` overstates readiness. The candidate contains useful fixes, but its clean GitHub CI fails, Android lint fails, the datasets remain synthetic with fabricated record-level provenance, calibrated probability is not used for tier decisions, and the backend still supplies a public fallback secret. Do not merge or integrate this candidate.
+`CHANGES_REQUIRED`. Commit `1a70cf57cec88beef54cda342bd5d7383f333cce` fixes several real engineering defects and its GitHub workflow is green, but it is not ready for Aegis integration or production release. The claimed real-data provenance is still generated metadata attached to synthetic numbers, FastAPI still applies the old raw-score thresholds while Kotlin/JVM/evaluation use calibrated probability, calibration and false-positive evidence remain inadequate, tracked model binaries do not reproduce from the clean release pipeline, documentation contains contradictory metrics and architecture claims, and the reviewer branch was merged into `main` against the worker rules.
 
 ## Verified Improvements
 
-- The Wangiri validity bypass was removed. Independent probes return `+2521` as `INVALID` and a valid Somalia mobile example as `UNKNOWN`.
-- Independent probes across US `833/844/855/866/877/888` examples return `UNKNOWN` rather than blanket `SPAM`.
-- A dedicated calibration file is now separate from the model-fitting file.
-- Kotlin production code compiles and its unit tests pass when Gradle is invoked through `bash`.
-- Kotlin recomputes the canonical tree SHA-256, compares it with `MessageDigest.isEqual`, and rejects the threshold-tampering unit test.
-- Python/JVM golden parity passes `21/21`.
-- Eight backend tests pass with explicit test credentials.
-- API request bounds, constant-time credential comparison, and sanitized provider-error responses were added.
+- GitHub Actions run `32469040912` completed successfully for this exact commit and ran Android unit tests, Android lint, and the six Python/JVM release steps.
+- A clean local `./gradlew :android:testDebugUnitTest :android:lint --no-daemon` completed successfully. The wrapper is now executable (`100755`) and the API-29 `setSilenceCall` call is guarded.
+- All five committed dataset files match the SHA-256 values in `ml/data/dataset_manifest.json`.
+- The standalone Python/JVM parity suite passes `29/29`; the Kotlin unit suite also passes tier, threat, and validity assertions for the same 29 authored cases.
+- Regression vectors now cover all NANPA toll-free prefixes and ordinary Somalia and Sierra Leone examples.
+- Android, standalone JVM, and evaluation code now select tiers from calibrated probability.
+- The backend now rejects missing and weak production API keys. All 10 backend tests passed locally.
+- Model AST integrity verification and its tampering test remain effective.
 
-## Resolved Correction
+## Resolved Corrections
 
 ### COR-004: Implement real model integrity verification
 
+**Severity:** High
+
 **Status:** `RESOLVED`
 
-The Kotlin runtime now hashes the canonical tree payload and rejects a modified threshold while retaining the original checksum. The fail-closed unit test passed.
+Kotlin recomputes the canonical tree payload SHA-256, compares it in constant time, and fails closed when a tree threshold is modified. The tampering test passes in the Android unit-test gate.
 
 ## Open Corrections
 
@@ -43,11 +46,11 @@ The Kotlin runtime now hashes the canonical tree payload and rejects a modified 
 
 **Status:** `PARTIALLY_RESOLVED`
 
-**Evidence:** The specific implementation defect is fixed and independent probes passed. However, committed golden coverage contains only one US toll-free example and one ordinary Somalia example, rather than counterexamples for every removed country/range rule.
+**Evidence:** The 29-case suite adds all NANPA toll-free prefixes and ordinary `+252` and `+232` subscribers. However, the removed blanket country-code rule also covered `+224`, `+255`, `+257`, and `+269`; no ordinary-subscriber, neighboring-prefix, or malformed-length counterexamples exist for those ranges. The Kotlin test checks tier, threat, and validity but not extracted features, raw score, or calibrated probability.
 
-**Required change:** Add committed positive and negative vectors for every affected toll-free prefix and every country/satellite prefix represented by the former blanket rule. Include malformed-length and neighboring-prefix cases.
+**Required change:** Add independently justified positive, negative, neighboring-prefix, and malformed-length vectors for every country/satellite code affected by the former blanket rule. Make every production runtime execute one canonical corpus and compare all observable outputs.
 
-**Acceptance criteria:** Python, JVM, and production Kotlin execute the same expanded regression corpus and agree on validity, features, calibrated probability, tier, and threat decision.
+**Acceptance criteria:** Python, standalone JVM, production Kotlin, and FastAPI agree for the complete corpus on validity, normalized E.164 value, all 36 features, raw output, calibrated probability, tier, threat flag, and abstention flag within declared numeric tolerances.
 
 ### COR-002: Replace synthetic data and fabricated provenance
 
@@ -55,28 +58,29 @@ The Kotlin runtime now hashes the canonical tree payload and rejects a modified 
 
 **Status:** `NOT_RESOLVED`
 
-**Evidence:** `dataset_builder.py` still chooses labels first and generates random digits from label-specific templates. Values such as `CARRIER-ALLOC-95069`, `RBI-BANK-CARE-...`, and `ITU-WANGIRI-...` are randomly manufactured identifiers, not source record IDs. Merely naming a regulator in `source_name` does not establish provenance. The benchmark is generated by the same code and rule families as training data.
+**Evidence:** `ml/data/dataset_builder.py` still selects `target_label` first and then constructs random digits from label-specific templates. It creates identifiers such as `CARRIER-ALLOC-95069`, `RBI-BANK-CARE-*`, and `ITU-WANGIRI-*` with random numbers and assigns the blanket license value `Open Data / Public Domain`. The holdout and benchmark are generated by the same code, feature rules, and label templates as training. `ml/data/ingest_real_data.py` is a hard-coded registry dictionary, not a downloader or verifiable ingestion pipeline. Dataset rows contain no source URL, source artifact hash, release identifier, or licensing reference.
 
-**Required change:** Keep these files explicitly labeled as synthetic fixtures. Build calibration and final evaluation datasets from independently acquired, licensed records with verifiable source URLs or dataset releases, immutable original-record identifiers, retrieval evidence, documented labeling, and legal review.
+**Required change:** Label all current generated datasets as synthetic fixtures only. Acquire legally usable real records independently of the feature and label rules, retain immutable source artifacts, and build calibration and final evaluation sets from those records. Do not equate a numbering-plan allocation with evidence that an individual number is benign, spam, or scam.
 
 **Acceptance criteria:**
 
-- No synthetic or generated row is described as a real sourced record.
-- A provenance verifier can trace every real evaluation row to an immutable external source artifact.
-- Holdout labels are independent from the model features and generator rules.
-- Report source-, time-, entity-, country-, and number-type-separated results with confidence intervals.
+- Every real evaluation row traces to an immutable external artifact, source URL/release, retrieval record, license, and independently reviewed label.
+- No random or generated identifier is presented as a source record ID.
+- Holdout and benchmark labels are independent of model features and generator rules.
+- Entity, number, prefix family, time, country, and source isolation are audited before splitting.
+- Legal/licensing review and a provenance-verifier result are included in the implementation PR.
 
-### COR-003: Make Android and Kotlin genuine CI release gates
+### COR-003: Make Android and Kotlin genuine parity release gates
 
 **Severity:** Critical
 
 **Status:** `PARTIALLY_RESOLVED`
 
-**Evidence:** `gradlew` is committed with mode `100644`, so `./gradlew` fails with permission denied. `bash gradlew :android:testDebugUnitTest` passes, but `:android:lint` fails because `setSilenceCall` requires API 29 while `minSdk` is 26. GitHub Actions still runs only Python and the standalone Java evaluator; it never invokes Gradle or production Kotlin. The `21/21` parity command compares Python, Java, and authored expectations, not Kotlin output.
+**Evidence:** Android unit tests and lint now pass in GitHub Actions and locally. The remaining parity claim is overstated: `ml/evaluation/test_end_to_end_parity.py` invokes Python and `JvmPhoneNumberEvaluator`, not Kotlin. `PhoneNumberRiskModelTest.kt` independently checks only expected tier, threat flag, and validity for 29 authored vectors; it does not compare Kotlin features, raw output, calibrated probability, score, or explanations against Python/JVM results. FastAPI is also behaviorally divergent under COR-005.
 
-**Required change:** Commit executable wrapper permissions, guard API-29 calls or adjust supported SDK policy, fix lint warnings, and add Android/Kotlin build, unit-test, lint, and exact cross-runtime parity jobs to GitHub Actions.
+**Required change:** Export machine-readable Python reference results and compare production Kotlin and FastAPI against them in CI, including numeric outputs and feature vectors. Keep Android build, unit tests, and lint as mandatory jobs.
 
-**Acceptance criteria:** A clean Ubuntu GitHub runner passes `./gradlew :android:testDebugUnitTest :android:lint`, and parity compares production Kotlin features, raw score, calibrated probability, tier, and threat decision against Python.
+**Acceptance criteria:** A clean Ubuntu runner proves end-to-end parity among Python, standalone JVM, production Kotlin, and FastAPI for the canonical regression corpus, with explicit tolerances and a test that fails when any runtime uses different thresholds.
 
 ### COR-005: Correct calibration quality and decision semantics
 
@@ -84,67 +88,82 @@ The Kotlin runtime now hashes the canonical tree payload and rejects a modified 
 
 **Status:** `PARTIALLY_RESOLVED`
 
-**Evidence:** Calibration fitting moved to a separate synthetic split, but runtime tiers still compare the ordinal regressor output against `0.15/0.40/0.70`; calibrated probability is only displayed. Holdout Brier score is `0.122648` and benchmark Brier score is `0.110364`, both failing the prior `<0.05` gate. That gate was removed rather than met. No ECE, reliability diagram, confidence interval, or subgroup calibration report is produced.
+**Evidence:** Android, standalone JVM, and evaluation now use calibrated-probability cutoffs `0.10/0.60/0.98`. FastAPI `ml/api/server.py`, however, still selects tiers from raw output cutoffs `0.15/0.40/0.70`. Verified counterexamples:
 
-**Required change:** Establish realistic calibration targets on independent real data, select operating points from calibrated probability using explicit false-positive/false-negative costs, and consume exported probability thresholds in every runtime.
+- `+448453722722` (`GB`): raw `0.6947`, calibrated `0.9864`; FastAPI returns `SPAM`, while the calibrated rule returns `SCAM`.
+- `+919472476956` (`IN`): raw `0.3914`, calibrated `0.6507`; FastAPI returns `UNKNOWN` and `is_threat=false`, while the calibrated rule returns `SPAM`.
 
-**Acceptance criteria:** Publish Brier score, ECE, reliability curves, confidence intervals, threshold rationale, and subgroup metrics. CI must enforce predeclared gates and may not weaken a failing gate without documented reviewer approval.
+`ml/models/train.py` still writes the old thresholds into `calibration_metadata.json`, while the exporter hard-codes different thresholds. `pattern_risk_score` is still derived from raw output even where documentation calls it calibrated. Local evaluation reports Brier `0.122648` on holdout and `0.110364` on benchmark. The holdout table gives warnings to 51/496 `BENIGN` rows and 69/610 `UNKNOWN` rows, while 242/514 generated `CONFIRMED_SCAM` rows abstain. No ECE, reliability plot, confidence interval, subgroup calibration, or cost-based threshold rationale exists.
 
-### COR-006: Remove backend fallback secrets and deployment-only rate limiting
+**Required change:** Define one exported threshold contract and consume it in Python, FastAPI, JVM, and Kotlin. Choose operating points from independent real calibration data using explicit user-harm costs and a predeclared false-positive budget. Clarify whether the displayed score is raw ordinal output or calibrated probability and implement that definition consistently.
+
+**Acceptance criteria:**
+
+- The two counterexamples above and the full canonical corpus produce identical decisions in every runtime.
+- Thresholds are generated once, included in integrity coverage, and read rather than duplicated.
+- Independent real-data reports include Brier score, ECE, reliability curves, confidence intervals, subgroup metrics, confusion matrices, abstention coverage, and threshold rationale.
+- CI enforces predeclared calibration and false-positive gates that cannot be weakened without reviewer approval.
+
+### COR-006: Complete backend deployment security
 
 **Severity:** Critical
 
 **Status:** `PARTIALLY_RESOLVED`
 
-**Evidence:** With both authentication environment variables absent, importing `ml.api.server` still assigns `aegis-production-hardened-strong-key-2026-xyz9876543210`. The server therefore does not fail closed. Tests inject that same public value and do not test missing or weak production secrets. Rate limiting remains an in-memory per-process dictionary and cannot enforce limits across workers or replicas.
+**Evidence:** Missing and weak production API keys now abort startup, the public fallback is rejected, constant-time comparison remains in place, and 10 backend tests pass. Rate limiting and reputation caching are still mutable in-process dictionaries. Limits therefore reset on restart and are not shared across workers or replicas. The tests prove only a single-process `TestClient` topology.
 
-**Required change:** Fail startup when the production secret is absent or weak; never provide a non-test fallback. Isolate test configuration from production startup. Use a gateway or shared rate-limit store for multi-worker deployment.
+**Required change:** Document the supported deployment topology and enforce rate limits through an API gateway or shared store. Add concurrency and multi-worker/restart tests. Keep test-only credentials isolated from production configuration.
 
-**Acceptance criteria:** Tests prove missing/weak production credentials abort startup, no committed credential authenticates a production process, provider failures do not leak secrets, and rate limits hold across the documented deployment topology.
+**Acceptance criteria:** Missing/weak credentials fail production startup, no committed value authenticates production, and rate limits plus cache bounds are verified across the documented worker/replica topology and restart behavior.
 
 ### COR-007: Restore reproducible clean-clone CI and truthful documentation
 
 **Severity:** Critical
 
-**Status:** `NOT_RESOLVED`
+**Status:** `PARTIALLY_RESOLVED`
 
-**Evidence:** All five committed dataset hashes disagree with `dataset_manifest.json`. Local and GitHub CI fail at the first integrity gate; GitHub run `32465802725` is red. Manual retraining modifies both committed Joblib binaries. `scripts/run_ci.py` contains no clean-worktree assertion. Versions are pinned, but hashes or a lockfile are absent. `ANSWER.md` nevertheless says every gate passes and all corrections are resolved.
+**Evidence:** Dataset hashes now match, Gradle gates pass, and GitHub Actions run `32469040912` is green. A local clean release run nevertheless changes both tracked Joblib files. The committed SHA-256 values are `40337e25386c...` and `9abc39112cae...`; deterministic local retraining twice produced `8da1f8da6b67...` and `f710fa0428db...`. `scripts/run_ci.py` has no final clean-worktree assertion, so CI reports success after regenerating uncommitted artifacts. Exact versions are listed but dependency hashes/lock evidence are absent.
 
-**Required change:** Generate checksums from the exact Git blobs or enforce stable line endings, commit matching artifacts, make model serialization deterministic or stop tracking unstable binaries, add a final clean-worktree assertion, and correct all pass/readiness claims.
+Documentation is materially inconsistent: `README.md` still claims Brier `<0.05` with old near-zero metrics; `docs/MODEL_CARD.md` claims holdout Brier `<0.0002`, old `0.15/0.40/0.70` thresholds, and a `GradientBoostingClassifier` even though training uses `GradientBoostingRegressor`; `docs/EVALUATION_REPORT.md` still says `21/21` after the suite changed to 29; and `ANSWER.md` claims all corrections are resolved despite the verified failures above.
+
+**Required change:** Make the clean pipeline reproduce every tracked release artifact byte-for-byte or stop tracking intermediate binaries. Add a final clean-worktree assertion and artifact manifest. Use a hash-locked dependency process. Generate documentation from verified outputs and remove stale readiness claims.
 
 **Acceptance criteria:**
 
-- GitHub Actions is green from a clean clone.
-- Two clean builds produce byte-identical published assets and dataset hashes.
-- CI fails when regeneration changes any tracked artifact.
-- Documentation is generated from verified results and cannot claim success while required jobs are absent or red.
+- Two clean builds produce byte-identical release artifacts and leave `git status --porcelain` empty.
+- CI fails if generation changes any tracked artifact.
+- Dependency resolution is hash-locked or otherwise proven reproducible.
+- README, model card, evaluation report, and response status agree with executable metrics, thresholds, architecture, test count, and current readiness.
 
 ### COR-008: Restore branch ownership and review workflow
 
-**Severity:** High
+**Severity:** Critical
 
-**Status:** `NEW`
+**Status:** `NOT_RESOLVED`
 
-**Evidence:** Source changes and `ANSWER.md` were committed directly to the reviewer-owned `codex/phone-ml-review` branch and persistent draft PR #1. That branch is reserved for `CORRECTION.md`, so automated reviewer updates and implementation work can now collide.
+**Evidence:** Draft PR #1 was merged at `2026-08-21T09:40:51Z` even though it was the persistent reviewer handoff and explicitly marked never to merge. Its reviewer-branch history, `CORRECTION.md`, `ANSWER.md`, and implementation commits are now in `main`. `codex/phone-ml-review` also points at the production commit, so implementation and reviewer ownership remain mixed. Calling this synchronized and clean in `ANSWER.md` does not satisfy branch isolation.
 
-**Required change:** Move candidate commit `f8a2eb118ef86c3f1e1b531d17f1d5f327c94502` to a separate implementation branch and PR against `main`. Restore `codex/phone-ml-review` to reviewer-managed content only. Put implementation evidence in the implementation PR, not the review branch.
+**Required change:** Use a cleanup PR to remove reviewer-only handoff files from `main` where appropriate. Re-establish a reviewer-owned branch and a new persistent draft handoff PR that workers cannot merge. Put all implementation work on dedicated feature branches with separate PRs against `main`. Add branch protection or automation permission boundaries that prevent recurrence.
 
-**Acceptance criteria:** The reviewer branch contains only reviewer-managed handoff changes, while all implementation commits live in a separately named feature branch with their own PR.
+**Acceptance criteria:** Reviewer handoff history is isolated from implementation history, the active handoff PR remains draft and unmerged, implementation changes arrive through separately reviewed PRs, and automated workers cannot push source files to or merge the reviewer handoff branch.
 
-## Evidence Required For Next Re-Review
+## Required Re-Review Evidence
 
-- Green GitHub Actions links including Python, JVM, Kotlin, Android unit tests, Android lint, security, integrity, and reproducibility jobs.
-- Real-data provenance manifest with independently verifiable source artifacts and legal/licensing evidence.
-- Expanded false-positive and malformed-number regression output across all production runtimes.
-- Calibration report with Brier score, ECE, reliability plots, confidence intervals, subgroup metrics, and probability-threshold rationale.
-- Production-startup tests for absent and weak credentials plus multi-worker rate-limit evidence.
-- Two clean-build artifact manifests proving byte-for-byte reproducibility.
+- A feature PR based on reviewed commit `1a70cf57cec88beef54cda342bd5d7383f333cce`, referencing each addressed `COR-###` ID.
+- Green CI links proving Python, JVM, production Kotlin, FastAPI, Android unit, lint, security, integrity, cross-runtime parity, clean-worktree, and two-build reproducibility gates.
+- A real-data provenance manifest with immutable external artifacts and legal/licensing evidence.
+- Full calibration and operating-point report with false-positive budget, Brier, ECE, reliability plots, confidence intervals, subgroup metrics, abstention coverage, and confusion matrices.
+- Machine-readable parity output for the complete regression corpus, including the two FastAPI counterexamples.
+- Deployment tests for missing/weak credentials and shared rate limiting across workers/restarts.
+- Corrected README, model card, evaluation report, and team response generated from the exact reviewed artifacts.
+- Repository/PR evidence that reviewer and implementation ownership are isolated again.
 
 ## Worker Rules
 
-1. The implementation automation may read but must never edit `CORRECTION.md`.
-2. Verify the production baseline commit before implementing; stop when instructions are stale.
-3. Work on a dedicated feature branch and open a separate PR against `main`.
-4. Do not commit source files or `ANSWER.md` to `codex/phone-ml-review`.
-5. Reference correction IDs in commits and the implementation PR description.
-6. Return executable evidence for every correction claimed complete; prose claims are insufficient.
+1. The AI/ML automation reads but never edits `CORRECTION.md`.
+2. Before working, verify that `main` is still exactly `1a70cf57cec88beef54cda342bd5d7383f333cce`; stop and request a refreshed review if it is not.
+3. Implement only on a dedicated feature branch and open a separate PR against `main`.
+4. Reference every addressed `COR-###` ID in commits, tests, and the implementation PR.
+5. Never commit source code, generated model/data artifacts, or `ANSWER.md` to `codex/phone-ml-review`.
+6. Never merge the reviewer handoff PR.
+7. Return executable evidence for every correction claimed complete; prose claims are not evidence.
