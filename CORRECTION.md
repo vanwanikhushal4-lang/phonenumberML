@@ -11,7 +11,7 @@
 | Review date | `2026-08-21` |
 | Reviewer branch | `codex/phone-ml-review` |
 | Team response | `ANSWER.md` at `1a70cf57cec88beef54cda342bd5d7383f333cce` |
-| Handoff PR | `#1` was merged unexpectedly and is no longer a valid draft handoff |
+| Handoff PR | `#2` (replacement draft); `#1` was merged unexpectedly |
 
 ## Readiness Verdict
 
